@@ -12,7 +12,7 @@ import type { CanInput } from '../engine/types.js'
 
 const bodySchema = {
     type: 'object',
-    required: ['action', 'object'],
+    required: ['subject', 'action', 'object'],
     properties: {
         subject: { type: 'string', minLength: 1 },
         action: { type: 'string', enum: ['read', 'edit', 'delete', 'manage'] },
@@ -23,7 +23,7 @@ const bodySchema = {
 } as const
 
 type CanBody = {
-    subject?: string
+    subject: string
     action: string
     object: string
     context?: { time?: string }
@@ -36,7 +36,7 @@ export async function canRoute(fastify: FastifyInstance): Promise<void> {
         schema: { body: bodySchema },
     }, async (request, reply) => {
         const body = request.body
-        const subject = body.subject ?? `tenant:${request.tenantId}`
+        const subject = body.subject
 
         // Build input without undefined fields (exactOptionalPropertyTypes)
         const input: CanInput = {

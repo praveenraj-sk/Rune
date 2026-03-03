@@ -19,9 +19,8 @@ export async function healthRoute(fastify: FastifyInstance): Promise<void> {
                 db: 'connected',
             })
         } catch {
-            // DB is down — still return 200 so load balancers keep the pod up
-            // but signal the issue via the db field
-            return reply.status(200).send({
+            // DB is down — 503 so load balancers and k8s readiness probes remove this pod
+            return reply.status(503).send({
                 status: 'degraded',
                 timestamp: new Date().toISOString(),
                 db: 'error',

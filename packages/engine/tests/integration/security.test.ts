@@ -98,7 +98,7 @@ describe('🛡️ Security Tests', () => {
     test('ATTACK 4 — Missing x-api-key returns 401', async () => {
         const res = await app.inject({
             method: 'POST', url: '/v1/can',
-            payload: { action: 'read', object: 'shipment:TN001' },
+            payload: { subject: 'user:attacker', action: 'read', object: 'shipment:TN001' },
         })
         expect(res.statusCode).toBe(401)
         const body = res.json<{ error: string }>()
@@ -110,7 +110,7 @@ describe('🛡️ Security Tests', () => {
         const res = await app.inject({
             method: 'POST', url: '/v1/can',
             headers: { 'x-api-key': 'totally-fake-key-00000' },
-            payload: { action: 'read', object: 'shipment:TN001' },
+            payload: { subject: 'user:attacker', action: 'read', object: 'shipment:TN001' },
         })
         expect(res.statusCode).toBe(401)
         const body = res.json<{ error: string }>()

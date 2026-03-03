@@ -52,7 +52,7 @@ describe('Auth Middleware', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/v1/can',
-            payload: { action: 'read', object: 'shipment:TN001' },
+            payload: { subject: 'user:test', action: 'read', object: 'shipment:TN001' },
         })
         expect(res.statusCode).toBe(401)
     })
@@ -62,7 +62,7 @@ describe('Auth Middleware', () => {
             method: 'POST',
             url: '/v1/can',
             headers: { 'x-api-key': INVALID_API_KEY },
-            payload: { action: 'read', object: 'shipment:TN001' },
+            payload: { subject: 'user:test', action: 'read', object: 'shipment:TN001' },
         })
         expect(res.statusCode).toBe(401)
     })
