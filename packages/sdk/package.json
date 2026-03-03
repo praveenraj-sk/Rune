@@ -1,5 +1,5 @@
 {
-    "name": "@rune/sdk",
+    "name": "@runeauth/sdk",
     "version": "1.0.0",
     "description": "Rune Authorization SDK — zero-dependency Node.js client for relationship-based access control",
     "type": "module",

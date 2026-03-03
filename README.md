@@ -84,11 +84,11 @@ pnpm dev
 ## SDK Usage
 
 ```bash
-npm install @rune/sdk
+npm install @runeauth/sdk
 ```
 
 ```ts
-import { Rune } from '@rune/sdk'
+import { Rune } from '@runeauth/sdk'
 
 const rune = new Rune({
   apiKey:  process.env.RUNE_API_KEY!,
@@ -250,7 +250,7 @@ rune/
 │   │       ├── logger/  # Pino structured logging
 │   │       ├── middleware/ # Auth + error handler
 │   │       └── routes/  # POST /can, /tuples, GET /health, /logs
-│   └── sdk/             # @rune/sdk (zero dependencies)
+│   └── sdk/             # @runeauth/sdk (zero dependencies)
 │       └── src/
 │           ├── client.ts  # HTTP client
 │           ├── fluent.ts  # can().do().on() builder

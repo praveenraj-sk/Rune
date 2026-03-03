@@ -1,9 +1,9 @@
 /**
- * @rune/sdk — Rune Authorization SDK
+ * @runeauth/sdk — Rune Authorization SDK
  *
  * @example
  * ```ts
- * import { Rune } from '@rune/sdk'
+ * import { Rune } from '@runeauth/sdk'
  *
  * const rune = new Rune({ apiKey: 'your-key', baseUrl: 'http://localhost:4078' })
  *
@@ -39,6 +39,6 @@ export class Rune extends RuneClient {
     }
 }
 
-// Re-export everything so users only need to import from '@rune/sdk'
+// Re-export everything so users only need to import from '@runeauth/sdk'
 export { RuneClient, RuneError }
 export type { RuneConfig, CanResult, TupleInput, TupleResult, LogsResult, HealthResult, Action }
