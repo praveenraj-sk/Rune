@@ -43,11 +43,11 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/praveenrajdevs-lgtm/Rune.git"
+        "url": "git+https://github.com/praveenraj-sk/Rune.git"
     },
-    "homepage": "https://github.com/praveenrajdevs-lgtm/Rune#readme",
+    "homepage": "https://github.com/praveenraj-sk/Rune#readme",
     "bugs": {
-        "url": "https://github.com/praveenrajdevs-lgtm/Rune/issues"
+        "url": "https://github.com/praveenraj-sk/Rune/issues"
     },
     "publishConfig": {
         "access": "public"
