@@ -4,8 +4,9 @@
  */
 import { config } from 'dotenv'
 
-// Load .env for tests — DATABASE_URL must be set
-config({ path: '../../.env' })
+// Load .env for tests — override:true ensures .env wins over any DATABASE_URL
+// already set in the shell environment (e.g. system Postgres on macOS/Linux)
+config({ path: '../../.env', override: true })
 
 // Verify required env vars are present before any test runs
 if (!process.env['DATABASE_URL']) {

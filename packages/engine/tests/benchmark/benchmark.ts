@@ -6,7 +6,9 @@
  *
  * Run: pnpm benchmark
  */
-import 'dotenv/config'
+import { config } from 'dotenv'
+config({ path: '../../.env', override: true })
+
 import { query } from '../../src/db/client.js'
 import { can } from '../../src/engine/can.js'
 import { cache } from '../../src/cache/lru.js'
