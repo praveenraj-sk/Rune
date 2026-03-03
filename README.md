@@ -35,18 +35,19 @@ pnpm install
 ### 3. Start Postgres
 
 ```bash
-# Docker
-docker-compose up -d
+# Docker Desktop
+docker compose up -d
 
-# Podman
-podman-compose up -d
+# Podman (built-in since Podman 4+)
+podman compose up -d
 ```
 
 > **Troubleshooting:** If you see `role "rune" does not exist`, your Postgres volume has stale data. Fix:
 > ```bash
-> docker-compose down -v   # wipe old volume
-> docker-compose up -d     # fresh start with correct user
+> docker compose down -v   # wipe old volume
+> docker compose up -d     # fresh start with correct user
 > ```
+> *(replace `docker` with `podman` if using Podman)*
 
 ### 4. Configure environment
 
