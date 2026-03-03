@@ -42,6 +42,12 @@ docker-compose up -d
 podman-compose up -d
 ```
 
+> **Troubleshooting:** If you see `role "rune" does not exist`, your Postgres volume has stale data. Fix:
+> ```bash
+> docker-compose down -v   # wipe old volume
+> docker-compose up -d     # fresh start with correct user
+> ```
+
 ### 4. Configure environment
 
 ```bash
