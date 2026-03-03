@@ -27,14 +27,18 @@
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/your-org/rune
-cd rune
+git clone https://github.com/praveenraj-sk/Rune.git
+cd Rune
 pnpm install
 ```
 
 ### 3. Start Postgres
 
 ```bash
+# Docker
+docker-compose up -d
+
+# Podman
 podman-compose up -d
 ```
 
@@ -48,7 +52,7 @@ cp .env.example .env
 ### 5. Run setup (creates schema + your first API key)
 
 ```bash
-node scripts/setup.mjs
+pnpm --filter @rune/engine exec tsx scripts/setup.mts
 ```
 
 Output:
@@ -245,8 +249,8 @@ rune/
 │           ├── types.ts   # Shared types
 │           └── index.ts   # Public API
 ├── scripts/
-│   └── setup.mjs        # First-time setup wizard
-├── podman-compose.yml
+│   └── setup.mts        # First-time setup wizard (tsx)
+├── docker-compose.yml
 └── .env.example
 ```
 
@@ -259,9 +263,10 @@ cd packages/engine
 pnpm test
 ```
 
-**Test coverage:** 43 tests across 5 suites
-- Unit: LRU cache (7), BFS traversal (8), can() function (7)
+**Test coverage:** 69 tests across 7 suites
+- Unit: LRU cache (7), BFS traversal (8), can() function (7), DB constraints (14), Failure modes (8)
 - Integration: Routes (11), Security (10)
+- SDK: 18 tests
 
 ---
 
@@ -273,6 +278,6 @@ pnpm test
 | `PORT` | ❌ | `3001` | Engine HTTP port |
 | `NODE_ENV` | ❌ | `development` | `development` or `production` |
 | `MAX_CACHE_SIZE` | ❌ | `10000` | Max LRU cache entries |
-| `MAX_BFS_DEPTH` | ❌ | `10` | Max BFS traversal depth |
+| `MAX_BFS_DEPTH` | ❌ | `20` | Max BFS traversal depth |
 | `MAX_BFS_NODES` | ❌ | `1000` | Max BFS nodes visited |
 | `API_KEY_SALT` | ❌ | — | Extra salt for key hashing |
