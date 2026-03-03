@@ -1,0 +1,55 @@
+{
+    "name": "@rune/sdk",
+    "version": "1.0.0",
+    "description": "Rune Authorization SDK — zero-dependency Node.js client for relationship-based access control",
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "typecheck": "tsc --noEmit",
+        "prepublishOnly": "pnpm typecheck && pnpm build"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "^5.6.0",
+        "vitest": "^2.1.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "keywords": [
+        "authorization",
+        "rebac",
+        "permissions",
+        "access-control",
+        "rune",
+        "iam"
+    ],
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/praveenrajdevs-lgtm/Rune.git"
+    },
+    "homepage": "https://github.com/praveenrajdevs-lgtm/Rune#readme",
+    "bugs": {
+        "url": "https://github.com/praveenrajdevs-lgtm/Rune/issues"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

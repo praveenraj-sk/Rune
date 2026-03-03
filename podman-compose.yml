@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rune-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rune
+      POSTGRES_PASSWORD: runepassword
+      POSTGRES_DB: runedb
+    ports:
+      - "5433:5432"
+    volumes:
+      - rune_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rune -d runedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rune_pgdata:
