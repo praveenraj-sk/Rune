@@ -52,7 +52,7 @@ cp .env.example .env
 ### 5. Run setup (creates schema + your first API key)
 
 ```bash
-pnpm --filter @rune/engine exec tsx scripts/setup.mts
+pnpm setup
 ```
 
 Output:
