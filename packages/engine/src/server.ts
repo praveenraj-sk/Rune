@@ -4,6 +4,14 @@
  * Registers all routes under /v1 prefix.
  * Global error handler never exposes stack traces or internal errors.
  */
+
+// Must be the very first thing — loads .env before any config is read.
+// override:true ensures .env wins over shell env vars (e.g. system DATABASE_URL).
+// process.cwd() = packages/engine/ when run via pnpm dev → ../../.env = project root
+import { config as loadEnv } from 'dotenv'
+import { resolve } from 'path'
+loadEnv({ path: resolve(process.cwd(), '../../.env'), override: true })
+
 import Fastify from 'fastify'
 import { config } from './config/index.js'
 import { logger } from './logger/index.js'
