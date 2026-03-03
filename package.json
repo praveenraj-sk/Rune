@@ -5,9 +5,12 @@
   "description": "Rune — Relationship-based authorization engine",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
+    "dev": "pnpm --filter @rune/engine dev",
     "setup": "pnpm --filter @rune/engine exec tsx scripts/setup.mts",
     "build": "pnpm --filter engine build && pnpm --filter sdk build",
     "test": "pnpm --filter engine test",
+    "test:sdk": "pnpm --filter sdk test",
+    "test:all": "pnpm --filter engine test && pnpm --filter sdk test",
     "test:security": "pnpm --filter engine test:security",
     "benchmark": "pnpm --filter engine benchmark",
     "db:schema": "psql $DATABASE_URL -f packages/engine/src/db/schema.sql",

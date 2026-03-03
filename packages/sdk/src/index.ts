@@ -5,7 +5,7 @@
  * ```ts
  * import { Rune } from '@rune/sdk'
  *
- * const rune = new Rune({ apiKey: 'your-key', baseUrl: 'http://localhost:3001' })
+ * const rune = new Rune({ apiKey: 'your-key', baseUrl: 'http://localhost:4078' })
  *
  * // Fluent style
  * const result = await rune.can('user:arjun').do('read').on('shipment:TN001')

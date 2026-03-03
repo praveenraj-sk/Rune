@@ -21,7 +21,7 @@
 
 ### 1. Prerequisites
 - Node.js 18+
-- Podman (or Docker)
+- [Docker Desktop](https://docs.docker.com/get-started/introduction/get-docker/) (or Podman)
 - pnpm
 
 ### 2. Clone and install
@@ -75,9 +75,8 @@ Output:
 ### 6. Start the engine
 
 ```bash
-cd packages/engine
 pnpm dev
-# Engine running at http://localhost:3001
+# Engine running at http://localhost:4078
 ```
 
 ---
@@ -92,8 +91,8 @@ npm install @rune/sdk
 import { Rune } from '@rune/sdk'
 
 const rune = new Rune({
-  apiKey:  'rune_abc123...',
-  baseUrl: 'http://localhost:3001',
+  apiKey:  process.env.RUNE_API_KEY!,
+  baseUrl: 'http://localhost:4078',
 })
 
 // Add a relationship
@@ -230,7 +229,7 @@ user:arjun  --[member]-->  group:chennai_managers
 - **API keys** are hashed with SHA-256 before storage — raw keys never hit the DB
 - **Tenant isolation** — every query is scoped to `tenant_id`, no cross-tenant leakage
 - **Fail-closed** — service errors return DENY, not ALLOW
-- **BFS limits** — max depth 10, max nodes 1000 — protects against graph bombs
+- **BFS limits** — max depth 20, max nodes 1000 — protects against graph bombs
 
 ---
 
@@ -241,6 +240,8 @@ rune/
 ├── packages/
 │   ├── engine/          # Fastify API server (TypeScript)
 │   │   └── src/
+│   │       ├── env-setup.ts # Loads .env (ESM-safe, runs before config)
+│   │       ├── server.ts    # Entry point
 │   │       ├── bfs/     # BFS graph traversal
 │   │       ├── cache/   # LRU cache with tenant isolation
 │   │       ├── config/  # Env validation (Zod)
@@ -255,8 +256,6 @@ rune/
 │           ├── fluent.ts  # can().do().on() builder
 │           ├── types.ts   # Shared types
 │           └── index.ts   # Public API
-├── scripts/
-│   └── setup.mts        # First-time setup wizard (tsx)
 ├── docker-compose.yml
 └── .env.example
 ```
@@ -270,10 +269,10 @@ cd packages/engine
 pnpm test
 ```
 
-**Test coverage:** 69 tests across 7 suites
+**Test coverage:** 87 tests across 8 suites
 - Unit: LRU cache (7), BFS traversal (8), can() function (7), DB constraints (14), Failure modes (8)
 - Integration: Routes (11), Security (10)
-- SDK: 18 tests
+- SDK: 18 tests (mock HTTP server)
 
 ---
 
@@ -282,7 +281,7 @@ pnpm test
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DATABASE_URL` | ✅ | — | Postgres connection string |
-| `PORT` | ❌ | `3001` | Engine HTTP port |
+| `PORT` | ❌ | `4078` | Engine HTTP port |
 | `NODE_ENV` | ❌ | `development` | `development` or `production` |
 | `MAX_CACHE_SIZE` | ❌ | `10000` | Max LRU cache entries |
 | `MAX_BFS_DEPTH` | ❌ | `20` | Max BFS traversal depth |

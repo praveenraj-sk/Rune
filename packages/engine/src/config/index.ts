@@ -10,7 +10,7 @@ import { z } from 'zod'
 
 const configSchema = z.object({
     server: z.object({
-        port: z.number().min(1).max(65535).default(3001),
+        port: z.number().min(1).max(65535).default(4078),
         nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
     }),
     db: z.object({
@@ -35,7 +35,7 @@ export type Config = z.infer<typeof configSchema>
 function loadConfig(): Config {
     const result = configSchema.safeParse({
         server: {
-            port: parseInt(process.env['PORT'] ?? '3001', 10),
+            port: parseInt(process.env['PORT'] ?? '4078', 10),
             nodeEnv: process.env['NODE_ENV'] ?? 'development',
         },
         db: {
