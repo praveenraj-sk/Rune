@@ -5,12 +5,9 @@
  * Global error handler never exposes stack traces or internal errors.
  */
 
-// Must be the very first thing — loads .env before any config is read.
-// override:true ensures .env wins over shell env vars (e.g. system DATABASE_URL).
-// process.cwd() = packages/engine/ when run via pnpm dev → ../../.env = project root
-import { config as loadEnv } from 'dotenv'
-import { resolve } from 'path'
-loadEnv({ path: resolve(process.cwd(), '../../.env'), override: true })
+// MUST be first — loads .env before config/index.ts evaluates process.env.
+// See env-setup.ts for why a separate file is required (ESM import hoisting).
+import './env-setup.js'
 
 import Fastify from 'fastify'
 import { config } from './config/index.js'
