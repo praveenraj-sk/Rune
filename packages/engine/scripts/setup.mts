@@ -25,7 +25,7 @@ const { Pool } = pkg
 // pnpm exec runs from packages/engine/ — project root is ../../
 // But NODE_ENV aware: also check for DATABASE_URL already in env
 const projectRoot = resolve(process.cwd(), '../..')
-loadEnv({ path: resolve(projectRoot, '.env') })
+loadEnv({ path: resolve(projectRoot, '.env'), override: true })
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 const c = {
