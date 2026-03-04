@@ -1,12 +1,12 @@
 /**
- * @rune/sdk Tests
+ * @runeauth/sdk Tests
  *
  * Uses a lightweight mock HTTP server (built-in Node.js http module)
  * so tests run with zero external dependencies and no real engine needed.
  *
  * Coverage:
  * - Rune class construction (missing apiKey/baseUrl throws)
- * - Fluent can().do().on() API returns CanResult
+ * - Fluent can().do().on() API returns Permission
  * - Direct check() API
  * - allow() and revoke() tuple management
  * - logs() decision log retrieval
@@ -17,11 +17,11 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest'
 import { createServer, type Server } from 'http'
 import { Rune, RuneError } from '../src/index.js'
-import type { CanResult, TupleResult, LogsResult, HealthResult } from '../src/types.js'
+import type { Permission, GrantResult, AuditLog, HealthStatus } from '../src/types.js'
 
 // ── Mock Server ───────────────────────────────────────────────────────────────
 
-const MOCK_ALLOW: CanResult = {
+const MOCK_ALLOW: Permission = {
     decision: 'allow',
     status: 'ALLOW',
     reason: 'Access granted',
@@ -32,7 +32,7 @@ const MOCK_ALLOW: CanResult = {
     sct: { lvn: 42 },
 }
 
-const MOCK_DENY: CanResult = {
+const MOCK_DENY: Permission = {
     decision: 'deny',
     status: 'DENY',
     reason: 'No valid relationship found',
@@ -43,9 +43,9 @@ const MOCK_DENY: CanResult = {
     sct: { lvn: 42 },
 }
 
-const MOCK_TUPLE: TupleResult = { success: true, lvn: 43 }
-const MOCK_HEALTH: HealthResult = { status: 'ok', db: 'connected', timestamp: new Date().toISOString() }
-const MOCK_LOGS: LogsResult = { logs: [{ id: '1', subject: 'user:alice', action: 'read', object: 'doc:report', decision: 'allow', status: 'ALLOW', reason: null, latency_ms: 2, cache_hit: false, created_at: new Date().toISOString() }] }
+const MOCK_GRANT_RESULT: GrantResult = { success: true, lvn: 43 }
+const MOCK_HEALTH: HealthStatus = { status: 'ok', db: 'connected', timestamp: new Date().toISOString() }
+const MOCK_AUDIT_LOG: AuditLog = { logs: [{ id: '1', subject: 'user:alice', action: 'read', object: 'doc:report', decision: 'allow', status: 'ALLOW', reason: null, latency_ms: 2, cache_hit: false, created_at: new Date().toISOString() }] }
 
 let server: Server
 let baseUrl: string
@@ -83,13 +83,13 @@ function startMockServer(): Promise<string> {
                     res.end(JSON.stringify(reply))
                 } else if (method === 'POST' && url === '/v1/tuples') {
                     res.writeHead(200)
-                    res.end(JSON.stringify(MOCK_TUPLE))
+                    res.end(JSON.stringify(MOCK_GRANT_RESULT))
                 } else if (method === 'DELETE' && url === '/v1/tuples') {
                     res.writeHead(200)
-                    res.end(JSON.stringify(MOCK_TUPLE))
+                    res.end(JSON.stringify(MOCK_GRANT_RESULT))
                 } else if (method === 'GET' && url === '/v1/logs') {
                     res.writeHead(200)
-                    res.end(JSON.stringify(MOCK_LOGS))
+                    res.end(JSON.stringify(MOCK_AUDIT_LOG))
                 } else if (method === 'GET' && url === '/v1/health') {
                     res.writeHead(200)
                     res.end(JSON.stringify(MOCK_HEALTH))
@@ -128,7 +128,7 @@ describe('Rune constructor', () => {
 describe('rune.can() — fluent API', () => {
     const rune = () => new Rune({ apiKey: 'test-key', baseUrl })
 
-    test('allows fluent chaining and returns CanResult', async () => {
+    test('allows fluent chaining and returns Permission', async () => {
         const result = await rune().can('user:alice').do('read').on('doc:report')
         expect(result.status).toBe('ALLOW')
         expect(result.decision).toBe('allow')
@@ -158,13 +158,13 @@ describe('rune.can() — fluent API', () => {
 describe('rune.check() — direct API', () => {
     const rune = () => new Rune({ apiKey: 'test-key', baseUrl })
 
-    test('returns CanResult for allow', async () => {
+    test('returns Permission for allow', async () => {
         const result = await rune().check({ subject: 'user:alice', action: 'read', object: 'doc:report' })
         expect(result.status).toBe('ALLOW')
         expect(Array.isArray(result.trace)).toBe(true)
     })
 
-    test('returns CanResult for deny', async () => {
+    test('returns Permission for deny', async () => {
         const result = await rune().check({ subject: 'user:bob', action: 'read', object: 'doc:secret' })
         expect(result.status).toBe('DENY')
     })
@@ -173,20 +173,20 @@ describe('rune.check() — direct API', () => {
 describe('rune.allow() and rune.revoke()', () => {
     const rune = () => new Rune({ apiKey: 'test-key', baseUrl })
 
-    test('allow() posts tuple and returns TupleResult', async () => {
+    test('allow() adds a grant and returns GrantResult', async () => {
         const result = await rune().allow({ subject: 'user:alice', relation: 'viewer', object: 'doc:report' })
         expect(result.success).toBe(true)
         expect(result.lvn).toBeGreaterThan(0)
     })
 
-    test('revoke() deletes tuple and returns TupleResult', async () => {
+    test('revoke() removes a grant and returns GrantResult', async () => {
         const result = await rune().revoke({ subject: 'user:alice', relation: 'viewer', object: 'doc:report' })
         expect(result.success).toBe(true)
     })
 })
 
 describe('rune.logs()', () => {
-    test('returns LogsResult with array', async () => {
+    test('returns AuditLog with entries', async () => {
         const rune = new Rune({ apiKey: 'test-key', baseUrl })
         const result = await rune.logs()
         expect(Array.isArray(result.logs)).toBe(true)
@@ -196,7 +196,7 @@ describe('rune.logs()', () => {
 })
 
 describe('rune.health()', () => {
-    test('returns HealthResult without API key', async () => {
+    test('returns HealthStatus without API key', async () => {
         const rune = new Rune({ apiKey: 'test-key', baseUrl })
         const result = await rune.health()
         expect(result.status).toBe('ok')

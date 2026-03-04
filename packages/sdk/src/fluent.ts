@@ -5,7 +5,7 @@
  * Each step narrows the type so TypeScript catches missing fields at compile time.
  */
 import type { RuneClient } from './client.js'
-import type { CanResult, Action } from './types.js'
+import type { Permission, Action } from './types.js'
 
 /** Step 1: who */
 export class SubjectBuilder {
@@ -29,7 +29,7 @@ export class ActionBuilder {
     ) { }
 
     /** Step 3: which resource — triggers the API call */
-    on(object: string, options?: { sct?: { lvn: number } }): Promise<CanResult> {
+    on(object: string, options?: { sct?: { lvn: number } }): Promise<Permission> {
         return this.client.check({
             subject: this.subject,
             action: this.action,

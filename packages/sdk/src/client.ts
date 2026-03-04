@@ -4,10 +4,10 @@
  * Zero dependencies — uses Node.js native fetch only.
  * Requires Node.js >= 18.
  */
-import type { RuneConfig, CanResult, TupleInput, TupleResult, LogsResult, HealthResult } from './types.js'
+import type { RuneOptions, Permission, Grant, GrantResult, AuditLog, HealthStatus } from './types.js'
 
 export class RuneClient {
-    constructor(private readonly config: RuneConfig) {
+    constructor(private readonly config: RuneOptions) {
         if (!config.apiKey) throw new Error('[Rune] apiKey is required')
         if (!config.baseUrl) throw new Error('[Rune] baseUrl is required')
     }
@@ -30,7 +30,6 @@ export class RuneClient {
         try {
             const url = `${this.config.baseUrl.replace(/\/$/, '')}${path}`
 
-            // Build init without undefined fields (exactOptionalPropertyTypes)
             const init: RequestInit = {
                 method,
                 headers: this.headers,
@@ -64,30 +63,30 @@ export class RuneClient {
         action: string
         object: string
         sct?: { lvn: number }
-    }): Promise<CanResult> {
-        return this.request<CanResult>('POST', '/v1/can', params)
+    }): Promise<Permission> {
+        return this.request<Permission>('POST', '/v1/can', params)
     }
 
-    /** Add a relationship tuple */
-    async allow(tuple: TupleInput): Promise<TupleResult> {
-        return this.request<TupleResult>('POST', '/v1/tuples', tuple)
+    /** Add a relationship — grant someone access */
+    async allow(grant: Grant): Promise<GrantResult> {
+        return this.request<GrantResult>('POST', '/v1/tuples', grant)
     }
 
-    /** Remove a relationship tuple */
-    async revoke(tuple: TupleInput): Promise<TupleResult> {
-        return this.request<TupleResult>('DELETE', '/v1/tuples', tuple)
+    /** Remove a relationship — revoke someone's access */
+    async revoke(grant: Grant): Promise<GrantResult> {
+        return this.request<GrantResult>('DELETE', '/v1/tuples', grant)
     }
 
-    /** Get recent decision logs for this tenant */
-    async logs(): Promise<LogsResult> {
-        return this.request<LogsResult>('GET', '/v1/logs')
+    /** Get recent decision audit log for this tenant */
+    async logs(): Promise<AuditLog> {
+        return this.request<AuditLog>('GET', '/v1/logs')
     }
 
-    /** Check engine health */
-    async health(): Promise<HealthResult> {
+    /** Check engine health status */
+    async health(): Promise<HealthStatus> {
         const url = `${this.config.baseUrl.replace(/\/$/, '')}/v1/health`
         const res = await fetch(url)
-        return res.json() as Promise<HealthResult>
+        return res.json() as Promise<HealthStatus>
     }
 }
 

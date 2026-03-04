@@ -1,16 +1,20 @@
 /**
  * Rune SDK — Types
  * All types shared between the client, fluent builder, and responses.
+ *
+ * Naming convention: "What IS it?" — plain English nouns, no jargon.
  */
 
-export type RuneConfig = {
+/** Options passed when creating a new Rune client */
+export type RuneOptions = {
     apiKey: string
     baseUrl: string
     /** Request timeout in ms. Default: 5000 */
     timeout?: number
 }
 
-export type CanResult = {
+/** Result of a permission check — what you get back from rune.check() */
+export type Permission = {
     decision: 'allow' | 'deny'
     status: 'ALLOW' | 'DENY' | 'NOT_FOUND' | 'CHALLENGE'
     reason: string
@@ -21,18 +25,21 @@ export type CanResult = {
     sct: { lvn: number }
 }
 
-export type TupleInput = {
+/** A relationship between a subject, relation, and object */
+export type Grant = {
     subject: string
     relation: 'owner' | 'editor' | 'viewer' | 'member'
     object: string
 }
 
-export type TupleResult = {
+/** Result of adding or removing a relationship */
+export type GrantResult = {
     success: boolean
     lvn: number
 }
 
-export type Log = {
+/** A single entry in the decision audit log */
+export type Audit = {
     id: string
     subject: string
     action: string
@@ -45,11 +52,13 @@ export type Log = {
     created_at: string
 }
 
-export type LogsResult = {
-    logs: Log[]
+/** The full audit log — list of recent decisions */
+export type AuditLog = {
+    logs: Audit[]
 }
 
-export type HealthResult = {
+/** Current health status of the engine */
+export type HealthStatus = {
     status: 'ok' | 'degraded'
     db: 'connected' | 'error'
     timestamp: string

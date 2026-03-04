@@ -7,38 +7,50 @@
  *
  * const rune = new Rune({ apiKey: 'your-key', baseUrl: 'http://localhost:4078' })
  *
- * // Fluent style
- * const result = await rune.can('user:arjun').do('read').on('shipment:TN001')
- * if (result.status === 'ALLOW') { // ✅ serve the request }
- *
- * // Direct style
- * const result2 = await rune.check({ subject: 'user:arjun', action: 'read', object: 'shipment:TN001' })
- *
- * // Manage relationships
- * await rune.allow({ subject: 'user:arjun', relation: 'viewer',  object: 'invoice:001' })
- * await rune.revoke({ subject: 'user:arjun', relation: 'viewer', object: 'invoice:001' })
+ * const permission = await rune.can('user:arjun').do('read').on('shipment:TN001')
+ * if (permission.status === 'ALLOW') { ... }
  * ```
  */
-import { RuneClient, RuneError } from './client.js'
+import { RuneClient } from './client.js'
 import { SubjectBuilder } from './fluent.js'
-import type { RuneConfig, CanResult, TupleInput, TupleResult, LogsResult, HealthResult, Action } from './types.js'
+import type { RuneOptions } from './types.js'
 
-export class Rune extends RuneClient {
-    constructor(config: RuneConfig) {
-        super(config)
+export class Rune {
+    private readonly client: RuneClient
+
+    readonly check: RuneClient['check']
+    readonly allow: RuneClient['allow']
+    readonly revoke: RuneClient['revoke']
+    readonly logs: RuneClient['logs']
+    readonly health: RuneClient['health']
+
+    constructor(options: RuneOptions) {
+        this.client = new RuneClient(options)
+        this.check = this.client.check.bind(this.client)
+        this.allow = this.client.allow.bind(this.client)
+        this.revoke = this.client.revoke.bind(this.client)
+        this.logs = this.client.logs.bind(this.client)
+        this.health = this.client.health.bind(this.client)
     }
 
     /**
-     * Start a fluent authorization check.
-     *
-     * @example
-     * const result = await rune.can('user:arjun').do('read').on('shipment:TN001')
+     * Start a fluent permission check.
+     * @example rune.can('user:arjun').do('read').on('shipment:TN001')
      */
     can(subject: string): SubjectBuilder {
-        return new SubjectBuilder(this, subject)
+        return new SubjectBuilder(this.client, subject)
     }
 }
 
 // Re-export everything so users only need to import from '@runeauth/sdk'
-export { RuneClient, RuneError }
-export type { RuneConfig, CanResult, TupleInput, TupleResult, LogsResult, HealthResult, Action }
+export { RuneClient, RuneError } from './client.js'
+export type {
+    RuneOptions,
+    Permission,
+    Grant,
+    GrantResult,
+    Audit,
+    AuditLog,
+    HealthStatus,
+    Action,
+} from './types.js'
