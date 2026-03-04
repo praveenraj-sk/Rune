@@ -1,0 +1,23 @@
+{
+    "name": "@runeauth/cli",
+    "version": "1.0.0",
+    "description": "Rune CLI — authorization as code",
+    "type": "module",
+    "bin": {
+        "rune": "./dist/index.js"
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsx src/index.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "js-yaml": "^4.1.0"
+    },
+    "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^22.0.0",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0"
+    }
+}
