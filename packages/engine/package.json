@@ -6,7 +6,7 @@
     "main": "dist/server.js",
     "scripts": {
         "dev": "tsx watch src/server.ts",
-        "build": "tsc && mkdir -p dist/dashboard && cp src/dashboard/index.html dist/dashboard/",
+        "build": "tsc && mkdir -p dist/dashboard && cp src/dashboard/index.html src/dashboard/styles.css src/dashboard/app.js dist/dashboard/",
         "start": "node dist/server.js",
         "test": "vitest run",
         "test:watch": "vitest",
