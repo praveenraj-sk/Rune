@@ -27,6 +27,13 @@ export type RuneOptions = {
         /** Time in ms to wait before trying again after circuit opens. Default: 30000 (30s) */
         resetTimeout?: number
     }
+    /** Local decision cache config. Set to false to disable. Default: disabled */
+    cache?: false | {
+        /** Max number of cached decisions. Default: 1000 */
+        maxSize?: number
+        /** Time-to-live in ms for cached decisions. Default: 30000 (30s) */
+        ttl?: number
+    }
 }
 
 /** Result of a permission check — what you get back from rune.check() */

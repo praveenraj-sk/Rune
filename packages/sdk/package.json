@@ -1,6 +1,6 @@
 {
     "name": "@runeauth/sdk",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "description": "Rune Authorization SDK — zero-dependency Node.js client for relationship-based access control",
     "type": "module",
     "main": "dist/index.cjs",

@@ -9,6 +9,7 @@
  * - Circuit breaker pattern (configurable)
  */
 import type { RuneOptions, Permission, Grant, GrantResult, AuditLog, HealthStatus } from './types.js'
+import { LocalCache } from './cache.js'
 
 // ── Circuit Breaker State ────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ class CircuitBreaker {
 
 export class RuneClient {
     private readonly circuit: CircuitBreaker | null
+    private readonly localCache: LocalCache | null
     private readonly retryAttempts: number
     private readonly retryBaseDelay: number
     private readonly retryMaxDelay: number
@@ -92,6 +94,16 @@ export class RuneClient {
             this.retryAttempts = r.attempts ?? 2
             this.retryBaseDelay = r.baseDelay ?? 200
             this.retryMaxDelay = r.maxDelay ?? 2000
+        }
+
+        // Local cache setup (disabled by default)
+        if (config.cache) {
+            const cacheOpts: { maxSize?: number; ttl?: number } = {}
+            if (config.cache.maxSize !== undefined) cacheOpts.maxSize = config.cache.maxSize
+            if (config.cache.ttl !== undefined) cacheOpts.ttl = config.cache.ttl
+            this.localCache = new LocalCache(cacheOpts)
+        } else {
+            this.localCache = null
         }
     }
 
@@ -214,17 +226,54 @@ export class RuneClient {
         object: string
         sct?: { lvn: number }
     }): Promise<Permission> {
-        return this.request<Permission>('POST', '/v1/can', params)
+        // Check local cache first (if enabled)
+        if (this.localCache) {
+            const key = LocalCache.buildKey(params.subject, params.action, params.object)
+            const cached = this.localCache.get(key, params.sct?.lvn)
+            if (cached) {
+                // Return a full Permission object from the cached subset
+                return {
+                    decision: cached.decision,
+                    status: cached.status,
+                    reason: cached.reason + ' (sdk-cache)',
+                    trace: [],
+                    suggested_fix: [],
+                    cache_hit: true,
+                    latency_ms: 0,
+                    sct: { lvn: params.sct?.lvn ?? 0 },
+                } as Permission
+            }
+        }
+
+        const result = await this.request<Permission>('POST', '/v1/can', params)
+
+        // Store in local cache (if enabled)
+        if (this.localCache && (result.status === 'ALLOW' || result.status === 'DENY')) {
+            const key = LocalCache.buildKey(params.subject, params.action, params.object)
+            this.localCache.set(
+                key,
+                { decision: result.decision, status: result.status, reason: result.reason },
+                result.sct?.lvn ?? 0,
+            )
+        }
+
+        return result
     }
 
     /** Add a relationship — grant someone access */
     async allow(grant: Grant): Promise<GrantResult> {
-        return this.request<GrantResult>('POST', '/v1/tuples', grant)
+        const result = await this.request<GrantResult>('POST', '/v1/tuples', grant)
+        // Invalidate local cache — permissions may have changed
+        this.localCache?.clear()
+        return result
     }
 
     /** Remove a relationship — revoke someone's access */
     async revoke(grant: Grant): Promise<GrantResult> {
-        return this.request<GrantResult>('DELETE', '/v1/tuples', grant)
+        const result = await this.request<GrantResult>('DELETE', '/v1/tuples', grant)
+        // Invalidate local cache — permissions may have changed
+        this.localCache?.clear()
+        return result
     }
 
     /** Get recent decision audit log for this tenant */
