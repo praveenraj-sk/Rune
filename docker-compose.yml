@@ -1,5 +1,13 @@
+# ─────────────────────────────────────────────────────────
+# Rune Self-Host — One Command
+#
+# Start:  docker compose up
+# Stop:   docker compose down
+# Reset:  docker compose down -v
+# ─────────────────────────────────────────────────────────
 
 services:
+  # Postgres — persistent storage
   postgres:
     image: postgres:16-alpine
     container_name: rune-postgres
@@ -17,6 +25,27 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Rune Engine — authorization server
+  rune:
+    build: .
+    container_name: rune-engine
+    restart: unless-stopped
+    ports:
+      - "4078:4078"
+    environment:
+      DATABASE_URL: postgres://rune:runepassword@postgres:5432/runedb
+      API_KEY: rune-dev-key
+      PORT: 4078
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4078/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   rune_pgdata:
