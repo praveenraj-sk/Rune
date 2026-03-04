@@ -19,6 +19,7 @@ import { setupRoute } from './routes/setup.route.js'
 import { statsRoute } from './routes/stats.route.js'
 import { adminRoute } from './routes/admin.route.js'
 import { errorHandler } from './middleware/error-handler.js'
+import { loadPolicy } from './policy/config.js'
 
 const fastify = Fastify({
     logger: false,  // we use our own pino logger
@@ -37,6 +38,9 @@ fastify.register(adminRoute, { prefix: '/v1' })
 // Start server
 const start = async () => {
     try {
+        // Load authorization policy from rune.config.yml (or defaults)
+        loadPolicy()
+
         const address = await fastify.listen({ port: config.server.port, host: '0.0.0.0' })
         logger.info({ address, env: config.server.nodeEnv }, 'rune_engine_started')
     } catch (err) {

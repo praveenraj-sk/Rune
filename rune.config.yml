@@ -1,0 +1,24 @@
+# Rune Config
+# Define your authorization model here.
+# This file lives in your repo — version-controlled, code-reviewed, deployed with your app.
+
+version: 1
+
+resources:
+  document:
+    roles:
+      owner:
+        actions: [read, edit, delete, share]
+      editor:
+        inherits: [viewer]
+        actions: [edit, share]
+      viewer:
+        actions: [read]
+
+  project:
+    roles:
+      admin:
+        inherits: [member]
+        actions: [manage, invite, delete]
+      member:
+        actions: [read, edit]

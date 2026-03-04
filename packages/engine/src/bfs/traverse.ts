@@ -21,6 +21,7 @@ import {
     getValidRelations,
     type TraversalResult,
 } from './types.js'
+import { extractResourceType } from '../policy/config.js'
 
 type TupleRow = {
     subject: string
@@ -42,8 +43,9 @@ export async function traverse(
     object: string,
     action: string,
 ): Promise<TraversalResult> {
-    // Step 1: Get valid relations for this action (supports custom actions)
-    const validRelations = getValidRelations(action)
+    // Step 1: Get valid relations for this action (config-driven with role inheritance)
+    const resourceType = extractResourceType(object)
+    const validRelations = getValidRelations(action, resourceType)
 
     // Step 2: Check the target object exists before doing any BFS
     // Distinguishes "doesn't exist" (NOT_FOUND) from "exists but no access" (DENY)
