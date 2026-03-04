@@ -27,6 +27,10 @@ export type MiddlewareConfig = {
     subjectFrom?: string | ((req: MiddlewareRequest) => string)
     /** Subject prefix. Default: 'user:' */
     subjectPrefix?: string
+    /** How to extract tenant from request. Default: 'default' */
+    tenantFrom?: string | ((req: MiddlewareRequest) => string)
+    /** Tenant prefix. e.g. 'org:' → org:acme. Default: '' */
+    tenantPrefix?: string
     /** Custom error handler. Default: sends 403 JSON */
     onDeny?: (req: MiddlewareRequest, res: MiddlewareResponse, reason: string) => void
 }
@@ -85,12 +89,16 @@ export function createProtectMiddleware(
                 return
             }
 
-            // 3. Check permission
-            const result = await client.check({ subject, action, object })
+            // 3. Extract tenant
+            const tenant = extractTenant(req, config?.tenantPrefix ?? '', config?.tenantFrom)
+
+            // 4. Check permission (with tenant)
+            const result = await client.check({ subject, action, object, tenant })
 
             if (result.status === 'ALLOW') {
-                // Attach permission to request for downstream use
+                // Attach permission + tenant to request for downstream use
                 (req as Record<string, unknown>).runePermission = result
+                    ; (req as Record<string, unknown>).runeTenant = tenant
                 next()
             } else {
                 sendDeny(req, res, result.reason ?? `${subject} cannot ${action} on ${object}`, config?.onDeny)
@@ -173,6 +181,41 @@ function extractSubject(
     }
 
     return null
+}
+
+// ── Tenant Extraction ───────────────────────────────────────
+
+function extractTenant(
+    req: MiddlewareRequest,
+    prefix: string,
+    tenantFrom?: string | ((req: MiddlewareRequest) => string),
+): string {
+    // Custom function
+    if (typeof tenantFrom === 'function') {
+        return tenantFrom(req) || 'default'
+    }
+
+    // Custom path (e.g. 'headers.x-org-id', 'user.orgId', 'params.orgId')
+    if (typeof tenantFrom === 'string') {
+        const value = getNestedValue(req as Record<string, unknown>, tenantFrom)
+        return value ? `${prefix}${value}` : 'default'
+    }
+
+    // Default: try common locations
+    const headers = req.headers as Record<string, string | string[] | undefined> | undefined
+    const candidates = [
+        headers?.['x-org-id'],
+        headers?.['x-tenant-id'],
+        headers?.['x-workspace-id'],
+    ] as unknown[]
+
+    for (const candidate of candidates) {
+        if (candidate !== undefined && candidate !== null && candidate !== '') {
+            return `${prefix}${candidate}`
+        }
+    }
+
+    return 'default'
 }
 
 // ── Error Response ──────────────────────────────────────────

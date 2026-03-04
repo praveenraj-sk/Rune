@@ -224,6 +224,7 @@ export class RuneClient {
         subject: string
         action: string
         object: string
+        tenant?: string
         sct?: { lvn: number }
     }): Promise<Permission> {
         // Check local cache first (if enabled)

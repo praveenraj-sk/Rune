@@ -31,13 +31,22 @@ type ResourceConfig = { roles?: Record<string, RoleConfig> }
 type Config = { version?: number; resources?: Record<string, ResourceConfig> }
 
 export async function explain(args: string[]): Promise<void> {
-    if (args.length < 3) {
-        console.log('\n  Usage: rune explain <subject> <action> <object>')
-        console.log('  Example: rune explain user:arjun read document:readme\n')
+    // Parse --tenant flag
+    const tenantIdx = args.indexOf('--tenant')
+    let tenant = 'default'
+    const cleanArgs = [...args]
+    if (tenantIdx !== -1) {
+        tenant = args[tenantIdx + 1] ?? 'default'
+        cleanArgs.splice(tenantIdx, 2)
+    }
+
+    if (cleanArgs.length < 3) {
+        console.log('\n  Usage: rune explain <subject> <action> <object> [--tenant <id>]')
+        console.log('  Example: rune explain user:arjun read document:readme --tenant org:acme\n')
         process.exit(1)
     }
 
-    const [subject, action, object] = args as [string, string, string]
+    const [subject, action, object] = cleanArgs as [string, string, string]
     const resourceType = object.includes(':') ? object.split(':')[0] : undefined
 
     // Load config
@@ -56,6 +65,9 @@ export async function explain(args: string[]): Promise<void> {
     console.log(`\n  ╭──────────────────────────────────────╮`)
     console.log(`  │  rune explain                        │`)
     console.log(`  ╰──────────────────────────────────────╯\n`)
+    if (tenant !== 'default') {
+        console.log(`  Tenant: ${tenant}`)
+    }
     console.log(`  Query: can ${subject} do "${action}" on ${object}?\n`)
 
     // Find resource
@@ -122,7 +134,7 @@ export async function explain(args: string[]): Promise<void> {
     console.log(`    the request will be ALLOWED:\n`)
 
     for (const role of grantingRoles) {
-        console.log(`      rune.allow({ subject: '${subject}', relation: '${role.name}', object: '${object}' })`)
+        console.log(`      rune.allow({ subject: '${subject}', relation: '${role.name}', object: '${object}', tenantId: '${tenant}' })`)
     }
 
     // Print full role resolution
