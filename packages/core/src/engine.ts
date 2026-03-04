@@ -22,6 +22,8 @@
  * ```
  */
 import type { TupleStore, Tuple } from './store/types.js'
+import type { DataSource } from './datasource/types.js'
+import { HybridStore } from './hybrid.js'
 import { traverse, type BfsOptions } from './bfs.js'
 import { loadPolicy, getValidRelationsFromPolicy, type ResolvedPolicy, type RuneConfig } from './policy.js'
 import { evaluateConditions, allConditionsPassed, type EvalContext, type ConditionResult } from './conditions.js'
@@ -30,6 +32,8 @@ export type EngineOptions = {
     store: TupleStore
     config?: string | RuneConfig     // path to yaml file OR inline config
     bfs?: BfsOptions
+    /** Zero-Sync: datasources that read from your app's existing DB */
+    dataSources?: DataSource[]
 }
 
 export type CanResult = {
@@ -47,7 +51,10 @@ export class RuneEngine {
     private readonly bfsOptions: BfsOptions
 
     constructor(options: EngineOptions) {
-        this.store = options.store
+        // If datasources provided, wrap store in HybridStore for Zero-Sync
+        this.store = options.dataSources && options.dataSources.length > 0
+            ? new HybridStore(options.store, options.dataSources)
+            : options.store
         this.policy = loadPolicy(options.config)
         this.bfsOptions = options.bfs ?? {}
     }

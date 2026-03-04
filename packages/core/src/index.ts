@@ -33,3 +33,8 @@ export type { ResolvedPolicy, RuneConfig, RoleDefinition, ResourceDefinition, Co
 
 export { evaluateConditions, allConditionsPassed } from './conditions.js'
 export type { EvalContext, ConditionResult } from './conditions.js'
+
+export { SqlDataSource } from './datasource/sql.js'
+export type { DataSource, DataSourceConfig, DataSourceMapping, ExternalTuple } from './datasource/types.js'
+
+export { HybridStore } from './hybrid.js'
