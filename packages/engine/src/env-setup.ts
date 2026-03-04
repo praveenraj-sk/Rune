@@ -10,11 +10,16 @@
  *
  * Importing this file as a side-effect (`import './env-setup.js'`) guarantees
  * dotenv runs first because ESM resolves modules in dependency order.
+ *
+ * In production (e.g. Render), env vars are injected by the platform,
+ * so dotenv is not needed — and it's a devDependency, so it won't exist.
  */
-import { config as loadEnv } from 'dotenv'
-import { resolve } from 'path'
+if (process.env['NODE_ENV'] !== 'production') {
+    const { config: loadEnv } = await import('dotenv')
+    const { resolve } = await import('path')
 
-// process.cwd() = packages/engine/ when run via `pnpm dev`
-// ../../.env = project root .env
-// override: true — .env wins over any DATABASE_URL already in the shell
-loadEnv({ path: resolve(process.cwd(), '../../.env'), override: true })
+    // process.cwd() = packages/engine/ when run via `pnpm dev`
+    // ../../.env = project root .env
+    // override: true — .env wins over any DATABASE_URL already in the shell
+    loadEnv({ path: resolve(process.cwd(), '../../.env'), override: true })
+}
