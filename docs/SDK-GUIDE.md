@@ -337,12 +337,12 @@ All types are exported:
 
 ```ts
 import type {
-  RuneConfig,    // constructor options
-  CanResult,     // response from can() / check()
-  TupleInput,    // input to allow() / revoke()
-  TupleResult,   // response from allow() / revoke()
-  LogsResult,    // response from logs()
-  HealthResult,  // response from health()
-  Action,        // 'read' | 'edit' | 'delete' | 'manage'
+  RuneOptions,    // constructor options
+  Permission,     // response from can() / check()
+  Grant,          // input to allow() / revoke()
+  GrantResult,    // response from allow() / revoke()
+  AuditLog,       // response from logs()
+  HealthStatus,   // response from health()
+  Action,         // 'read' | 'edit' | 'delete' | 'manage'
 } from '@runeauth/sdk'
 ```

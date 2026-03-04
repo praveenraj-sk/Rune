@@ -35,7 +35,7 @@ Client                    Engine
   │                         │      ├─ Get current LVN
   │                         │      ├─ Cache result
   │                         │      └─ Fire-and-forget: log decision to DB
-  │                         ├─ 4. Return CanResult
+  │                         ├─ 4. Return Permission
   │◄────────────────────────┤
 ```
 

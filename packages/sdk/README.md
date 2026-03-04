@@ -113,7 +113,7 @@ const result = await rune.check({
 
 ---
 
-### `rune.allow(tuple)` — Add a relationship
+### `rune.allow(grant)` — Add a relationship
 
 ```ts
 await rune.allow({
@@ -125,7 +125,7 @@ await rune.allow({
 
 ---
 
-### `rune.revoke(tuple)` — Remove a relationship
+### `rune.revoke(grant)` — Remove a relationship
 
 ```ts
 await rune.revoke({
@@ -168,13 +168,13 @@ const rune = new Rune({
 
 // Protect a route
 app.get('/shipments/:id', async (req, res) => {
-  const result = await rune
+  const permission = await rune
     .can(`user:${req.user.id}`)
     .do('read')
     .on(`shipment:${req.params.id}`)
 
-  if (result.status !== 'ALLOW') {
-    return res.status(403).json({ error: 'Access denied', hint: result.suggested_fix })
+  if (permission.status !== 'ALLOW') {
+    return res.status(403).json({ error: 'Access denied', hint: permission.suggested_fix })
   }
 
   const shipment = await db.getShipment(req.params.id)
@@ -192,7 +192,7 @@ The SDK throws `RuneError` for HTTP errors:
 import { Rune, RuneError } from '@runeauth/sdk'
 
 try {
-  const result = await rune.can('user:arjun').do('read').on('shipment:TN001')
+  const permission = await rune.can('user:arjun').do('read').on('shipment:TN001')
 } catch (err) {
   if (err instanceof RuneError) {
     console.error(err.statusCode) // 401, 403, 500...
@@ -205,13 +205,13 @@ try {
 
 ## SCT — Stale Cache Token (advanced)
 
-If you need read-your-writes consistency after adding a tuple:
+If you need read-your-writes consistency after adding a relationship:
 
 ```ts
 const { lvn } = await rune.allow({ subject: 'user:arjun', relation: 'viewer', object: 'doc:123' })
 
 // Pass the lvn back to bypass cache for this check
-const result = await rune.can('user:arjun').do('read').on('doc:123', { sct: { lvn } })
+const permission = await rune.can('user:arjun').do('read').on('doc:123', { sct: { lvn } })
 ```
 
 ---
@@ -221,7 +221,7 @@ const result = await rune.can('user:arjun').do('read').on('doc:123', { sct: { lv
 Fully typed. All types are exported:
 
 ```ts
-import type { CanResult, TupleInput, HealthResult, Action } from '@runeauth/sdk'
+import type { Permission, Grant, HealthStatus, Action } from '@runeauth/sdk'
 ```
 
 ---
