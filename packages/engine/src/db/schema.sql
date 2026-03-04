@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS tuples (
   tenant_id   UUID        NOT NULL,
   subject     TEXT        NOT NULL,
-  relation    TEXT        NOT NULL CHECK (relation IN ('owner','editor','viewer','member')),
+  relation    TEXT        NOT NULL,
   object      TEXT        NOT NULL,
   lvn         BIGINT      NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -10,7 +10,7 @@
  * main can() function to throw or return ALLOW when it should DENY.
  */
 import { query } from '../db/client.js'
-import { ACTION_RELATION_MAP } from '../bfs/types.js'
+import { getValidRelations } from '../bfs/types.js'
 import { logger } from '../logger/index.js'
 import type { TraceNode } from './types.js'
 
@@ -62,8 +62,7 @@ export async function buildSuggestedFix(
     action: string,
 ): Promise<string[]> {
     try {
-        const validRelations = ACTION_RELATION_MAP[action as keyof typeof ACTION_RELATION_MAP]
-        if (!validRelations) return [`Ask an admin to grant ${action} access to ${object}`]
+        const validRelations = getValidRelations(action)
 
         const result = await query<{ subject: string; relation: string }>(
             `SELECT subject, relation

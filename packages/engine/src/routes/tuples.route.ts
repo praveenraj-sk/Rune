@@ -19,14 +19,14 @@ const bodySchema = {
     required: ['subject', 'relation', 'object'],
     properties: {
         subject: { type: 'string', minLength: 1 },
-        relation: { type: 'string', enum: ['owner', 'editor', 'viewer', 'member'] },
+        relation: { type: 'string', minLength: 1 },
         object: { type: 'string', minLength: 1 },
     },
 } as const
 
 type TupleBody = {
     subject: string
-    relation: 'owner' | 'editor' | 'viewer' | 'member'
+    relation: string
     object: string
 }
 

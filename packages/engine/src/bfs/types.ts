@@ -17,18 +17,27 @@ export type QueueItem = {
 }
 
 /**
- * Maps each action to the set of relations that grant that action.
- * Read is most permissive. Delete/manage require owner.
+ * Default built-in action → relation mapping.
+ * These provide sensible defaults for standard CRUD operations.
  *
- * This is the policy engine's core rule set for Phase 1.
- * Phase 2 replaces this with a compiled policy engine.
+ * For CUSTOM actions (e.g. 'approve', 'export', 'share'):
+ * The action name is matched directly as a relation.
+ * So if you do rune.can('user:x').do('approve').on('doc:y'),
+ * it will look for a tuple with relation = 'approve'.
  */
-export const ACTION_RELATION_MAP = {
-    read: ['viewer', 'editor', 'owner'] as const,
-    edit: ['editor', 'owner'] as const,
-    delete: ['owner'] as const,
-    manage: ['owner'] as const,
-} as const
+const DEFAULT_ACTION_RELATIONS: Record<string, readonly string[]> = {
+    read: ['viewer', 'editor', 'owner'],
+    edit: ['editor', 'owner'],
+    delete: ['owner'],
+    manage: ['owner'],
+}
 
-export type Action = keyof typeof ACTION_RELATION_MAP
-export type ValidRelations = (typeof ACTION_RELATION_MAP)[Action][number]
+/**
+ * Get the valid relations that grant a given action.
+ * - Built-in actions (read/edit/delete/manage) use the default mapping.
+ * - Custom actions match themselves as a relation name, plus 'owner' (owners can do everything).
+ */
+export function getValidRelations(action: string): readonly string[] {
+    return DEFAULT_ACTION_RELATIONS[action] ?? [action, 'owner']
+}
+

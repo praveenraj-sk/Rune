@@ -18,7 +18,7 @@ import { config } from '../config/index.js'
 import { query } from '../db/client.js'
 import { logger } from '../logger/index.js'
 import {
-    ACTION_RELATION_MAP,
+    getValidRelations,
     type TraversalResult,
 } from './types.js'
 
@@ -34,7 +34,7 @@ type TupleRow = {
  * @param tenantId - Tenant scope — all DB queries filtered by this
  * @param subject  - Entity requesting access: "user:arjun"
  * @param object   - Target resource: "shipment:TN001"
- * @param action   - Requested action: "read" | "edit" | "delete" | "manage"
+ * @param action   - Requested action: any string (e.g. "read", "approve", "export")
  */
 export async function traverse(
     tenantId: string,
@@ -42,12 +42,8 @@ export async function traverse(
     object: string,
     action: string,
 ): Promise<TraversalResult> {
-    // Step 1: Validate the action is known
-    const validRelations = ACTION_RELATION_MAP[action as keyof typeof ACTION_RELATION_MAP]
-    if (!validRelations) {
-        logger.warn({ tenantId, action }, 'bfs_unknown_action')
-        return { found: false, objectExists: false, path: [], nodeCount: 0, depthReached: 0, limitHit: null }
-    }
+    // Step 1: Get valid relations for this action (supports custom actions)
+    const validRelations = getValidRelations(action)
 
     // Step 2: Check the target object exists before doing any BFS
     // Distinguishes "doesn't exist" (NOT_FOUND) from "exists but no access" (DENY)

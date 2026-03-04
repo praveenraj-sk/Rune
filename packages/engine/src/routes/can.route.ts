@@ -15,7 +15,7 @@ const bodySchema = {
     required: ['subject', 'action', 'object'],
     properties: {
         subject: { type: 'string', minLength: 1 },
-        action: { type: 'string', enum: ['read', 'edit', 'delete', 'manage'] },
+        action: { type: 'string', minLength: 1 },
         object: { type: 'string', minLength: 1 },
         context: { type: 'object', properties: { time: { type: 'string' } } },
         sct: { type: 'object', properties: { lvn: { type: 'number' } } },

@@ -28,7 +28,7 @@ export type Permission = {
 /** A relationship between a subject, relation, and object */
 export type Grant = {
     subject: string
-    relation: 'owner' | 'editor' | 'viewer' | 'member'
+    relation: string
     object: string
 }
 
@@ -64,5 +64,5 @@ export type HealthStatus = {
     timestamp: string
 }
 
-/** The 4 supported actions */
-export type Action = 'read' | 'edit' | 'delete' | 'manage'
+/** Any action string — built-in: 'read' | 'edit' | 'delete' | 'manage', plus any custom action */
+export type Action = string
