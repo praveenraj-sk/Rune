@@ -11,6 +11,22 @@ export type RuneOptions = {
     baseUrl: string
     /** Request timeout in ms. Default: 5000 */
     timeout?: number
+    /** Retry config. Set to false to disable. Default: enabled with 3 attempts */
+    retry?: false | {
+        /** Max retry attempts (not counting the initial request). Default: 2 */
+        attempts?: number
+        /** Initial backoff delay in ms. Doubles on each retry. Default: 200 */
+        baseDelay?: number
+        /** Max backoff delay in ms. Default: 2000 */
+        maxDelay?: number
+    }
+    /** Circuit breaker config. Set to false to disable. Default: enabled */
+    circuitBreaker?: false | {
+        /** Number of consecutive failures to trip the circuit. Default: 5 */
+        threshold?: number
+        /** Time in ms to wait before trying again after circuit opens. Default: 30000 (30s) */
+        resetTimeout?: number
+    }
 }
 
 /** Result of a permission check — what you get back from rune.check() */

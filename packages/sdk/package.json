@@ -1,14 +1,21 @@
 {
     "name": "@runeauth/sdk",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "description": "Rune Authorization SDK — zero-dependency Node.js client for relationship-based access control",
     "type": "module",
-    "main": "dist/index.js",
+    "main": "dist/index.cjs",
+    "module": "dist/index.js",
     "types": "dist/index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.js",
-            "types": "./dist/index.d.ts"
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
         }
     },
     "files": [
@@ -17,15 +24,15 @@
         "LICENSE"
     ],
     "scripts": {
-        "build": "tsc",
+        "build": "tsup",
         "test": "vitest run",
         "test:watch": "vitest",
         "typecheck": "tsc --noEmit",
         "prepublishOnly": "pnpm typecheck && pnpm build"
     },
-    "dependencies": {},
     "devDependencies": {
         "@types/node": "^22.0.0",
+        "tsup": "^8.5.1",
         "typescript": "^5.6.0",
         "vitest": "^2.1.0"
     },
