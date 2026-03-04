@@ -15,6 +15,7 @@ import { logger } from './logger/index.js'
 import { canRoute } from './routes/can.route.js'
 import { tuplesRoute } from './routes/tuples.route.js'
 import { healthRoute } from './routes/health.route.js'
+import { setupRoute } from './routes/setup.route.js'
 import { errorHandler } from './middleware/error-handler.js'
 
 const fastify = Fastify({
@@ -27,6 +28,7 @@ fastify.setErrorHandler(errorHandler)
 fastify.register(canRoute, { prefix: '/v1' })
 fastify.register(tuplesRoute, { prefix: '/v1' })
 fastify.register(healthRoute, { prefix: '/v1' })
+fastify.register(setupRoute, { prefix: '/v1' })
 
 // Start server
 const start = async () => {

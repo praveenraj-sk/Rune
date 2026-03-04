@@ -36,6 +36,7 @@ COPY --from=builder /app/package.json .
 COPY --from=builder /app/pnpm-workspace.yaml .
 COPY --from=builder /app/packages/engine/package.json ./packages/engine/
 COPY --from=builder /app/packages/engine/dist ./packages/engine/dist
+COPY --from=builder /app/packages/engine/src/db/schema.sql ./packages/engine/src/db/schema.sql
 # We need to copy packages/sdk because engine might have a workspace: dependency on it
 COPY --from=builder /app/packages/sdk/package.json ./packages/sdk/
 COPY --from=builder /app/packages/sdk/dist ./packages/sdk/dist
