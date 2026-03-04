@@ -26,7 +26,19 @@ If a valid path exists → `ALLOW`. If not → `DENY`.
 
 ## Prerequisites
 
-You need a running Rune engine. Clone and start it:
+You need a running Rune engine. Two options:
+
+### Option A — Use the hosted cloud engine (easiest)
+
+No setup needed! Use the public Render deployment:
+
+```
+Base URL: https://rune-engine.onrender.com
+```
+
+Ask the project owner for an API key.
+
+### Option B — Run locally
 
 ```bash
 git clone https://github.com/praveenraj-sk/Rune.git
@@ -46,8 +58,8 @@ pnpm dev                 # engine starts at http://localhost:4078
 import { Rune } from '@runeauth/sdk'
 
 const rune = new Rune({
-  apiKey:  process.env.RUNE_API_KEY!,   // from pnpm run setup
-  baseUrl: 'http://localhost:4078',
+  apiKey:  process.env.RUNE_API_KEY!,
+  baseUrl: 'https://rune-engine.onrender.com',  // or http://localhost:4078 for local
 })
 
 // Fluent API

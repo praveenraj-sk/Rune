@@ -104,7 +104,7 @@ import { Rune } from '@runeauth/sdk'
 
 const rune = new Rune({
   apiKey:  process.env.RUNE_API_KEY!,
-  baseUrl: 'http://localhost:4078',
+  baseUrl: 'https://rune-engine.onrender.com',  // or http://localhost:4078 for local
 })
 
 // Add a relationship
@@ -127,6 +127,18 @@ const { logs } = await rune.logs()
 // Health check
 const health = await rune.health()
 ```
+
+---
+
+## ☁️ Cloud Deployment
+
+Rune is deployed and live at:
+
+```
+https://rune-engine.onrender.com
+```
+
+See [Deployment Guide](docs/DEPLOY.md) for full setup instructions.
 
 ---
 
