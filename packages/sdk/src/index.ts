@@ -13,6 +13,7 @@
  */
 import { RuneClient } from './client.js'
 import { SubjectBuilder } from './fluent.js'
+import { createProtectMiddleware, type MiddlewareConfig, type MiddlewareFn } from './middleware.js'
 import type { RuneOptions } from './types.js'
 
 export class Rune {
@@ -40,10 +41,30 @@ export class Rune {
     can(subject: string): SubjectBuilder {
         return new SubjectBuilder(this.client, subject)
     }
+
+    /**
+     * Create route protection middleware.
+     *
+     * @example
+     * ```ts
+     * // Express
+     * app.get('/docs/:id', rune.protect('read', 'document:{{params.id}}'), handler)
+     *
+     * // Custom subject extraction
+     * app.get('/docs/:id', rune.protect('read', 'document:{{params.id}}', {
+     *   subjectFrom: 'auth.userId',
+     *   subjectPrefix: 'user:',
+     * }), handler)
+     * ```
+     */
+    protect(action: string, objectTemplate: string, config?: MiddlewareConfig): MiddlewareFn {
+        return createProtectMiddleware(this.client, action, objectTemplate, config)
+    }
 }
 
 // Re-export everything so users only need to import from '@runeauth/sdk'
 export { RuneClient, RuneError } from './client.js'
+export { createProtectMiddleware } from './middleware.js'
 export type {
     RuneOptions,
     Permission,
@@ -54,3 +75,4 @@ export type {
     HealthStatus,
     Action,
 } from './types.js'
+export type { MiddlewareConfig, MiddlewareFn } from './middleware.js'
