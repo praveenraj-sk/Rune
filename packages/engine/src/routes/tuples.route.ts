@@ -32,6 +32,58 @@ type TupleBody = {
 
 export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
 
+    // GET /v1/tuples — list relationships (paginated, filterable)
+    fastify.get<{
+        Querystring: { page?: string; limit?: string; search?: string }
+    }>('/tuples', {
+        preHandler: authMiddleware,
+    }, async (request, reply) => {
+        const tenantId = request.tenantId
+        const page = Math.max(1, parseInt(request.query.page ?? '1', 10))
+        const limit = Math.min(100, Math.max(1, parseInt(request.query.limit ?? '50', 10)))
+        const offset = (page - 1) * limit
+        const search = request.query.search?.trim()
+
+        try {
+            let whereClause = 'WHERE tenant_id = $1'
+            const params: (string | number)[] = [tenantId]
+
+            if (search) {
+                params.push(`%${search}%`)
+                const idx = params.length
+                whereClause += ` AND (subject ILIKE $${idx} OR relation ILIKE $${idx} OR object ILIKE $${idx})`
+            }
+
+            const countResult = await query<{ count: string }>(
+                `SELECT COUNT(*) as count FROM tuples ${whereClause}`, params
+            )
+            const total = parseInt(countResult.rows[0]?.count ?? '0', 10)
+
+            const dataParams = [...params, limit, offset]
+            const result = await query<{
+                subject: string; relation: string; object: string; created_at: string
+            }>(
+                `SELECT subject, relation, object, created_at
+                 FROM tuples ${whereClause}
+                 ORDER BY created_at DESC
+                 LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+                dataParams
+            )
+
+            return reply.status(200).send({
+                tuples: result.rows,
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit),
+            })
+        } catch (error) {
+            logger.error({ error: (error as Error).message, tenantId }, 'tuples_list_failed')
+            return reply.status(500).send({ error: 'internal_error' })
+        }
+    })
+
+
     // POST /v1/tuples — add a relationship
     fastify.post<{ Body: TupleBody }>('/tuples', {
         preHandler: authMiddleware,

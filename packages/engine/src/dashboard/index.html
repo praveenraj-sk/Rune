@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rune Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--bg2:#12121a;--bg3:#1a1a2e;--bg4:#252540;
+  --text:#e4e4ed;--text2:#9898b0;--text3:#6b6b80;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-glow:rgba(108,92,231,0.15);
+  --green:#00b894;--red:#ff6b6b;--orange:#fdcb6e;--blue:#74b9ff;
+  --border:#2a2a40;--radius:12px;--radius-sm:8px;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent2);text-decoration:none}
+
+/* Auth overlay */
+.auth-overlay{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center}
+.auth-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:400px;text-align:center}
+.auth-box h1{font-size:1.5rem;margin-bottom:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.auth-box p{color:var(--text2);font-size:0.85rem;margin-bottom:24px}
+.auth-box input{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.9rem;outline:none;margin-bottom:16px;font-family:inherit}
+.auth-box input:focus{border-color:var(--accent)}
+.auth-box button{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),#7c3aed);border:none;border-radius:var(--radius-sm);color:#fff;font-weight:600;cursor:pointer;font-size:0.9rem;font-family:inherit;transition:opacity 0.2s}
+.auth-box button:hover{opacity:0.9}
+.auth-error{color:var(--red);font-size:0.8rem;margin-top:8px}
+
+/* Layout */
+.app{display:none;min-height:100vh}
+.header{padding:16px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2)}
+.header h1{font-size:1.1rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.header h1 span{font-size:1.3rem}
+.header-right{display:flex;align-items:center;gap:16px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.btn-logout{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 14px;color:var(--text2);cursor:pointer;font-size:0.8rem;font-family:inherit;transition:all 0.2s}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 32px}
+.tab{padding:14px 20px;cursor:pointer;color:var(--text2);font-size:0.85rem;font-weight:500;border-bottom:2px solid transparent;transition:all 0.2s;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+
+/* Content */
+.content{padding:28px 32px;max-width:1200px}
+.panel{display:none}
+.panel.active{display:block}
+
+/* Stats cards */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat:nth-child(1)::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.stat:nth-child(2)::before{background:linear-gradient(90deg,var(--green),#55efc4)}
+.stat:nth-child(3)::before{background:linear-gradient(90deg,var(--red),#fab1a0)}
+.stat:nth-child(4)::before{background:linear-gradient(90deg,var(--blue),#81ecec)}
+.stat:nth-child(5)::before{background:linear-gradient(90deg,var(--orange),#ffeaa7)}
+.stat-label{font-size:0.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.stat-value{font-size:1.8rem;font-weight:700}
+.stat-sub{font-size:0.75rem;color:var(--text2);margin-top:4px}
+
+/* Table */
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.search{flex:1;max-width:360px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.85rem;outline:none;font-family:inherit}
+.search:focus{border-color:var(--accent)}
+.btn{padding:10px 20px;background:linear-gradient(135deg,var(--accent),#7c3aed);border:none;border-radius:var(--radius-sm);color:#fff;font-weight:600;cursor:pointer;font-size:0.85rem;font-family:inherit;transition:all 0.2s;display:flex;align-items:center;gap:6px}
+.btn:hover{opacity:0.9;transform:translateY(-1px)}
+.btn-danger{background:linear-gradient(135deg,var(--red),#e17055)}
+.btn-sm{padding:6px 12px;font-size:0.78rem}
+
+table{width:100%;border-collapse:collapse;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+th{background:var(--bg3);text-align:left;padding:12px 16px;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);font-weight:600}
+td{padding:12px 16px;border-top:1px solid var(--border);font-size:0.85rem}
+tr:hover td{background:var(--accent-glow)}
+.mono{font-family:'SF Mono',Consolas,monospace;font-size:0.8rem}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.72rem;font-weight:600;text-transform:uppercase}
+.badge-allow{background:rgba(0,184,148,0.15);color:var(--green)}
+.badge-deny{background:rgba(255,107,107,0.15);color:var(--red)}
+.badge-relation{background:var(--accent-glow);color:var(--accent2)}
+.badge-notfound{background:rgba(253,203,110,0.15);color:var(--orange)}
+
+/* Pagination */
+.pagination{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px}
+.page-btn{padding:8px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;font-size:0.8rem;font-family:inherit;transition:all 0.2s}
+.page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent2)}
+.page-btn:disabled{opacity:0.4;cursor:not-allowed}
+.page-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.page-info{color:var(--text3);font-size:0.8rem}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:500}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:440px}
+.modal h2{font-size:1.1rem;margin-bottom:20px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:0.78rem;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+.form-group input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:0.85rem;outline:none;font-family:inherit}
+.form-group input:focus{border-color:var(--accent)}
+.form-group .hint{font-size:0.72rem;color:var(--text3);margin-top:4px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+.btn-cancel{padding:10px 20px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;font-family:inherit;font-size:0.85rem}
+
+/* Logs */
+.log-filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;color:var(--text2);cursor:pointer;font-size:0.78rem;font-family:inherit;transition:all 0.2s}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);color:var(--accent2);background:var(--accent-glow)}
+
+/* Settings */
+.settings-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
+.settings-card h3{font-size:0.9rem;margin-bottom:12px;color:var(--accent2)}
+.settings-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border-bottom:none}
+.settings-label{font-size:0.8rem;color:var(--text2)}
+.settings-value{font-size:0.8rem;font-family:'SF Mono',Consolas,monospace}
+
+/* Empty state */
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty-icon{font-size:2.5rem;margin-bottom:12px}
+.empty p{font-size:0.9rem}
+
+/* Responsive */
+@media(max-width:768px){
+  .content{padding:16px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .toolbar{flex-direction:column}
+  .search{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- Auth Screen -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <h1>🔐 Rune Admin</h1>
+    <p>Enter your API key to access the dashboard</p>
+    <input type="password" id="authKey" placeholder="rune_xxxxxxxxxxxxxxxx" autocomplete="off">
+    <button onclick="authenticate()">Connect</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div class="app" id="app">
+  <div class="header">
+    <h1><span>🔐</span> Rune Admin</h1>
+    <div class="header-right">
+      <span><span class="status-dot" id="statusDot"></span> <span id="statusText" style="font-size:0.8rem;color:var(--text2)">Connected</span></span>
+      <button class="btn-logout" onclick="logout()">Disconnect</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+    <div class="tab" onclick="switchTab('relationships')">🔗 Relationships</div>
+    <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
+    <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+  </div>
+
+  <!-- Dashboard Tab -->
+  <div class="content">
+    <div class="panel active" id="panel-dashboard">
+      <div class="stats" id="statsCards">
+        <div class="stat"><div class="stat-label">Total Relationships</div><div class="stat-value" id="statTuples">—</div></div>
+        <div class="stat"><div class="stat-label">Decisions Today</div><div class="stat-value" id="statDecisions">—</div><div class="stat-sub" id="statDecisionsSub"></div></div>
+        <div class="stat"><div class="stat-label">Denied Today</div><div class="stat-value" id="statDenied">—</div></div>
+        <div class="stat"><div class="stat-label">Avg Latency</div><div class="stat-value" id="statLatency">—</div><div class="stat-sub">ms per check</div></div>
+        <div class="stat"><div class="stat-label">Cache Size</div><div class="stat-value" id="statCache">—</div><div class="stat-sub" id="statCacheSub"></div></div>
+      </div>
+      <h3 style="font-size:0.9rem;color:var(--text2);margin-bottom:12px">Recent Decisions</h3>
+      <table>
+        <thead><tr><th>Subject</th><th>Action</th><th>Object</th><th>Result</th><th>Latency</th><th>Time</th></tr></thead>
+        <tbody id="recentLogs"></tbody>
+      </table>
+    </div>
+
+    <!-- Relationships Tab -->
+    <div class="panel" id="panel-relationships">
+      <div class="toolbar">
+        <input class="search" type="text" id="tupleSearch" placeholder="Search by subject, relation, or object..." oninput="debouncedSearch()">
+        <button class="btn" onclick="showAddModal()">+ Add Relationship</button>
+      </div>
+      <table>
+        <thead><tr><th>Subject</th><th>Relation</th><th>Object</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="tuplesBody"></tbody>
+      </table>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div class="panel" id="panel-logs">
+      <div class="log-filters">
+        <button class="filter-btn active" onclick="filterLogs('all')">All</button>
+        <button class="filter-btn" onclick="filterLogs('allow')">✅ Allowed</button>
+        <button class="filter-btn" onclick="filterLogs('deny')">❌ Denied</button>
+      </div>
+      <table>
+        <thead><tr><th>Subject</th><th>Action</th><th>Object</th><th>Result</th><th>Reason</th><th>Latency</th><th>Cached</th><th>Time</th></tr></thead>
+        <tbody id="logsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="panel" id="panel-settings">
+      <div class="settings-card">
+        <h3>Connection</h3>
+        <div class="settings-row"><span class="settings-label">Engine URL</span><span class="settings-value" id="settingsUrl"></span></div>
+        <div class="settings-row"><span class="settings-label">API Key</span><span class="settings-value" id="settingsKey"></span></div>
+        <div class="settings-row"><span class="settings-label">Status</span><span class="settings-value" id="settingsStatus"></span></div>
+      </div>
+      <div class="settings-card">
+        <h3>Engine Info</h3>
+        <div class="settings-row"><span class="settings-label">Database</span><span class="settings-value" id="settingsDb"></span></div>
+        <div class="settings-row"><span class="settings-label">Cache Max Size</span><span class="settings-value" id="settingsCacheMax"></span></div>
+        <div class="settings-row"><span class="settings-label">Cache Current Size</span><span class="settings-value" id="settingsCacheCurrent"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Relationship Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2>Add Relationship</h2>
+    <div class="form-group">
+      <label>Subject</label>
+      <input type="text" id="addSubject" placeholder="user:arjun">
+      <div class="hint">Format: type:identifier (e.g. user:123, group:engineering)</div>
+    </div>
+    <div class="form-group">
+      <label>Relation</label>
+      <input type="text" id="addRelation" placeholder="editor">
+      <div class="hint">e.g. viewer, editor, owner, member, or any custom relation</div>
+    </div>
+    <div class="form-group">
+      <label>Object</label>
+      <input type="text" id="addObject" placeholder="doc:readme">
+      <div class="hint">Format: type:identifier (e.g. doc:123, project:alpha)</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="hideAddModal()">Cancel</button>
+      <button class="btn" onclick="addTuple()">Add Relationship</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────
+let API_KEY = ''
+let BASE_URL = ''
+let currentPage = 1
+let currentSearch = ''
+let currentLogFilter = 'all'
+let allLogs = []
+let searchTimeout = null
+
+// ── Auth ────────────────────────────────────────────────────
+function getBaseUrl() {
+  return window.location.origin
+}
+
+async function authenticate() {
+  const key = document.getElementById('authKey').value.trim()
+  if (!key) { document.getElementById('authError').textContent = 'Please enter an API key'; return }
+
+  BASE_URL = getBaseUrl()
+  try {
+    const res = await fetch(`${BASE_URL}/v1/health`)
+    if (!res.ok) throw new Error('Engine unreachable')
+
+    // Test API key with stats endpoint
+    const statsRes = await fetch(`${BASE_URL}/v1/stats`, { headers: { 'x-api-key': key } })
+    if (statsRes.status === 401) { document.getElementById('authError').textContent = 'Invalid API key'; return }
+    if (!statsRes.ok) throw new Error('Stats endpoint failed')
+
+    API_KEY = key
+    localStorage.setItem('rune_api_key', key)
+    document.getElementById('authOverlay').style.display = 'none'
+    document.getElementById('app').style.display = 'block'
+    loadAll()
+  } catch (e) {
+    document.getElementById('authError').textContent = e.message
+  }
+}
+
+function logout() {
+  API_KEY = ''
+  localStorage.removeItem('rune_api_key')
+  document.getElementById('app').style.display = 'none'
+  document.getElementById('authOverlay').style.display = 'flex'
+  document.getElementById('authKey').value = ''
+  document.getElementById('authError').textContent = ''
+}
+
+// Auto-login if key is stored
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('rune_api_key')
+  if (saved) {
+    document.getElementById('authKey').value = saved
+    authenticate()
+  }
+})
+
+// Enter key on auth input
+document.getElementById('authKey').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') authenticate()
+})
+
+// ── API ─────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' } }
+  if (body) opts.body = JSON.stringify(body)
+  const res = await fetch(`${BASE_URL}${path}`, opts)
+  if (res.status === 401) { logout(); throw new Error('Unauthorized') }
+  return res.json()
+}
+
+// ── Load All ────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadStats(), loadTuples(), loadLogs(), loadSettings()])
+}
+
+// ── Dashboard ───────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const data = await api('GET', '/v1/stats')
+    document.getElementById('statTuples').textContent = data.total_tuples.toLocaleString()
+    document.getElementById('statDecisions').textContent = data.decisions_today.toLocaleString()
+    document.getElementById('statDecisionsSub').textContent = `${data.allow_today} allowed · ${data.deny_today} denied`
+    document.getElementById('statDenied').textContent = data.deny_today.toLocaleString()
+    document.getElementById('statLatency').textContent = data.avg_latency_ms.toFixed(1)
+    document.getElementById('statCache').textContent = data.cache_stats.size.toLocaleString()
+    document.getElementById('statCacheSub').textContent = `of ${data.cache_stats.maxSize.toLocaleString()} max`
+  } catch {}
+}
+
+async function loadRecentLogs() {
+  try {
+    const data = await api('GET', '/v1/logs')
+    const tbody = document.getElementById('recentLogs')
+    tbody.innerHTML = data.logs.slice(0, 10).map(l => `
+      <tr>
+        <td class="mono">${esc(l.subject)}</td>
+        <td class="mono">${esc(l.action)}</td>
+        <td class="mono">${esc(l.object)}</td>
+        <td><span class="badge badge-${l.status === 'ALLOW' ? 'allow' : l.status === 'NOT_FOUND' ? 'notfound' : 'deny'}">${esc(l.status)}</span></td>
+        <td>${parseFloat(l.latency_ms).toFixed(1)}ms</td>
+        <td style="color:var(--text3)">${timeAgo(l.created_at)}</td>
+      </tr>
+    `).join('')
+    if (data.logs.length === 0) tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><p>No decisions yet</p></div></td></tr>'
+  } catch {}
+}
+
+// ── Relationships ───────────────────────────────────────────
+async function loadTuples(page = 1, search = '') {
+  currentPage = page
+  currentSearch = search
+  try {
+    const params = new URLSearchParams({ page: String(page), limit: '20' })
+    if (search) params.set('search', search)
+    const data = await api('GET', `/v1/tuples?${params}`)
+
+    const tbody = document.getElementById('tuplesBody')
+    if (data.tuples.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="empty-icon">🔗</div><p>No relationships found</p></div></td></tr>'
+    } else {
+      tbody.innerHTML = data.tuples.map(t => `
+        <tr>
+          <td class="mono">${esc(t.subject)}</td>
+          <td><span class="badge badge-relation">${esc(t.relation)}</span></td>
+          <td class="mono">${esc(t.object)}</td>
+          <td style="color:var(--text3)">${timeAgo(t.created_at)}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="removeTuple('${esc(t.subject)}','${esc(t.relation)}','${esc(t.object)}')">Remove</button></td>
+        </tr>
+      `).join('')
+    }
+
+    // Pagination
+    const pag = document.getElementById('pagination')
+    if (data.pages > 1) {
+      let html = `<button class="page-btn" onclick="loadTuples(${page-1},'${esc(search)}')" ${page<=1?'disabled':''}>← Prev</button>`
+      html += `<span class="page-info">Page ${page} of ${data.pages} (${data.total} total)</span>`
+      html += `<button class="page-btn" onclick="loadTuples(${page+1},'${esc(search)}')" ${page>=data.pages?'disabled':''}>Next →</button>`
+      pag.innerHTML = html
+    } else {
+      pag.innerHTML = data.total > 0 ? `<span class="page-info">${data.total} relationship${data.total===1?'':'s'}</span>` : ''
+    }
+  } catch {}
+}
+
+function debouncedSearch() {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    loadTuples(1, document.getElementById('tupleSearch').value)
+  }, 300)
+}
+
+function showAddModal() { document.getElementById('addModal').classList.add('show') }
+function hideAddModal() { document.getElementById('addModal').classList.remove('show'); clearAddForm() }
+function clearAddForm() { ['addSubject','addRelation','addObject'].forEach(id => document.getElementById(id).value = '') }
+
+async function addTuple() {
+  const subject = document.getElementById('addSubject').value.trim()
+  const relation = document.getElementById('addRelation').value.trim()
+  const object = document.getElementById('addObject').value.trim()
+  if (!subject || !relation || !object) return
+
+  try {
+    await api('POST', '/v1/tuples', { subject, relation, object })
+    hideAddModal()
+    loadTuples(currentPage, currentSearch)
+    loadStats()
+  } catch (e) { alert('Failed: ' + e.message) }
+}
+
+async function removeTuple(subject, relation, object) {
+  if (!confirm(`Remove: ${subject} → ${relation} → ${object}?`)) return
+  try {
+    await api('DELETE', '/v1/tuples', { subject, relation, object })
+    loadTuples(currentPage, currentSearch)
+    loadStats()
+  } catch (e) { alert('Failed: ' + e.message) }
+}
+
+// ── Logs ────────────────────────────────────────────────────
+async function loadLogs() {
+  try {
+    const data = await api('GET', '/v1/logs')
+    allLogs = data.logs
+    renderLogs()
+    loadRecentLogs()
+  } catch {}
+}
+
+function renderLogs() {
+  const filtered = currentLogFilter === 'all' ? allLogs :
+    allLogs.filter(l => currentLogFilter === 'allow' ? l.status === 'ALLOW' : l.status !== 'ALLOW')
+
+  const tbody = document.getElementById('logsBody')
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="empty-icon">📋</div><p>No logs matching filter</p></div></td></tr>'
+    return
+  }
+  tbody.innerHTML = filtered.map(l => `
+    <tr>
+      <td class="mono">${esc(l.subject)}</td>
+      <td class="mono">${esc(l.action)}</td>
+      <td class="mono">${esc(l.object)}</td>
+      <td><span class="badge badge-${l.status === 'ALLOW' ? 'allow' : l.status === 'NOT_FOUND' ? 'notfound' : 'deny'}">${esc(l.status)}</span></td>
+      <td style="color:var(--text2);font-size:0.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.reason || '—')}</td>
+      <td>${parseFloat(l.latency_ms).toFixed(1)}ms</td>
+      <td>${l.cache_hit ? '⚡ cache' : '🌐 live'}</td>
+      <td style="color:var(--text3)">${timeAgo(l.created_at)}</td>
+    </tr>
+  `).join('')
+}
+
+function filterLogs(type) {
+  currentLogFilter = type
+  document.querySelectorAll('.log-filters .filter-btn').forEach(b => b.classList.remove('active'))
+  event.target.classList.add('active')
+  renderLogs()
+}
+
+// ── Settings ────────────────────────────────────────────────
+async function loadSettings() {
+  document.getElementById('settingsUrl').textContent = BASE_URL
+  document.getElementById('settingsKey').textContent = API_KEY.slice(0, 8) + '••••••••' + API_KEY.slice(-4)
+  try {
+    const health = await fetch(`${BASE_URL}/v1/health`).then(r => r.json())
+    document.getElementById('settingsStatus').textContent = health.status === 'ok' ? '✅ Connected' : '⚠️ Degraded'
+    document.getElementById('settingsDb').textContent = health.db === 'connected' ? '✅ Connected' : '❌ Error'
+    const stats = await api('GET', '/v1/stats')
+    document.getElementById('settingsCacheMax').textContent = stats.cache_stats.maxSize.toLocaleString()
+    document.getElementById('settingsCacheCurrent').textContent = stats.cache_stats.size.toLocaleString()
+  } catch {}
+}
+
+// ── Tab Navigation ──────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+  event.target.classList.add('active')
+  document.getElementById(`panel-${name}`).classList.add('active')
+  // Refresh data on tab switch
+  if (name === 'dashboard') { loadStats(); loadRecentLogs() }
+  if (name === 'relationships') loadTuples(currentPage, currentSearch)
+  if (name === 'logs') loadLogs()
+  if (name === 'settings') loadSettings()
+}
+
+// ── Helpers ─────────────────────────────────────────────────
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML }
+
+function timeAgo(dateStr) {
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
+  if (diff < 60) return `${Math.floor(diff)}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+// Auto-refresh every 10 seconds
+setInterval(() => {
+  if (API_KEY && document.getElementById('panel-dashboard').classList.contains('active')) {
+    loadStats(); loadRecentLogs()
+  }
+}, 10000)
+</script>
+</body>
+</html>
