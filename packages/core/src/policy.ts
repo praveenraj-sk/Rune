@@ -11,8 +11,14 @@ export type RoleDefinition = {
     inherits?: string[]
 }
 
+export type ConditionDef = {
+    when: Record<string, unknown>
+    apply_to: string[]
+}
+
 export type ResourceDefinition = {
     roles: Record<string, RoleDefinition>
+    conditions?: Record<string, ConditionDef>
 }
 
 export type RuneConfig = {
@@ -25,6 +31,7 @@ export type ResolvedPolicy = {
         name: string
         roles: Record<string, { name: string; actions: string[]; resolvedActions: string[]; inherits: string[] }>
         actionToRoles: Record<string, string[]>
+        conditions?: Record<string, ConditionDef>
     }>
 }
 
@@ -83,7 +90,7 @@ function resolve(config: RuneConfig): ResolvedPolicy {
             }
         }
 
-        resources[resName] = { name: resName, roles: resolvedRoles, actionToRoles }
+        resources[resName] = { name: resName, roles: resolvedRoles, actionToRoles, conditions: resDef.conditions }
     }
 
     return { resources }

@@ -29,4 +29,7 @@ export { traverse } from './bfs.js'
 export type { TraversalResult, BfsOptions } from './bfs.js'
 
 export { loadPolicy, getValidRelationsFromPolicy } from './policy.js'
-export type { ResolvedPolicy, RuneConfig, RoleDefinition, ResourceDefinition } from './policy.js'
+export type { ResolvedPolicy, RuneConfig, RoleDefinition, ResourceDefinition, ConditionDef } from './policy.js'
+
+export { evaluateConditions, allConditionsPassed } from './conditions.js'
+export type { EvalContext, ConditionResult } from './conditions.js'

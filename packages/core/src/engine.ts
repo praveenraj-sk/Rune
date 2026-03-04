@@ -22,8 +22,9 @@
  * ```
  */
 import type { TupleStore, Tuple } from './store/types.js'
-import { traverse, type TraversalResult, type BfsOptions } from './bfs.js'
+import { traverse, type BfsOptions } from './bfs.js'
 import { loadPolicy, getValidRelationsFromPolicy, type ResolvedPolicy, type RuneConfig } from './policy.js'
+import { evaluateConditions, allConditionsPassed, type EvalContext, type ConditionResult } from './conditions.js'
 
 export type EngineOptions = {
     store: TupleStore
@@ -36,6 +37,7 @@ export type CanResult = {
     status: 'ALLOW' | 'DENY' | 'NOT_FOUND'
     reason: string
     trace: string[]
+    condition_results: ConditionResult[]
     latency_ms: number
 }
 
@@ -52,16 +54,18 @@ export class RuneEngine {
 
     /**
      * Check if subject can perform action on object.
+     * Three-pass evaluation: ReBAC (BFS) → RBAC (role inheritance) → ABAC (conditions).
+     *
+     * @param context - Optional ABAC context: { time, ip, resource: { status: ... } }
      */
-    async can(subject: string, action: string, object: string, tenantId = 'default'): Promise<CanResult> {
+    async can(subject: string, action: string, object: string, tenantId = 'default', context?: EvalContext): Promise<CanResult> {
         const start = performance.now()
 
         try {
-            // Get valid relations from config
+            // Step 1 (ReBAC + RBAC): Get valid relations from config, run BFS
             const resourceType = this.extractResourceType(object)
             const validRelations = getValidRelationsFromPolicy(this.policy, action, resourceType)
 
-            // Run BFS
             const result = await traverse(
                 this.store,
                 tenantId,
@@ -71,26 +75,47 @@ export class RuneEngine {
                 this.bfsOptions,
             )
 
-            const latency = performance.now() - start
-
             if (!result.objectExists) {
                 return {
                     decision: 'deny',
                     status: 'NOT_FOUND',
                     reason: `object "${object}" not found in store`,
                     trace: [],
-                    latency_ms: latency,
+                    condition_results: [],
+                    latency_ms: performance.now() - start,
                 }
             }
 
+            if (!result.found) {
+                return {
+                    decision: 'deny',
+                    status: 'DENY',
+                    reason: `no path from ${subject} to ${object} with relations [${validRelations.join(', ')}]`,
+                    trace: result.path,
+                    condition_results: [],
+                    latency_ms: performance.now() - start,
+                }
+            }
+
+            // Step 2 (ABAC): Evaluate conditions from config
+            const resourceConfig = resourceType ? this.policy.resources[resourceType] : undefined
+            const conditionResults = evaluateConditions(
+                resourceConfig?.conditions,
+                action,
+                context ?? {},
+            )
+
+            const conditionsPass = allConditionsPassed(conditionResults)
+
             return {
-                decision: result.found ? 'allow' : 'deny',
-                status: result.found ? 'ALLOW' : 'DENY',
-                reason: result.found
+                decision: conditionsPass ? 'allow' : 'deny',
+                status: conditionsPass ? 'ALLOW' : 'DENY',
+                reason: conditionsPass
                     ? `${subject} can ${action} on ${object} via path: ${result.path.join(' → ')}`
-                    : `no path from ${subject} to ${object} with relations [${validRelations.join(', ')}]`,
+                    : `ABAC conditions failed: ${conditionResults.filter(c => !c.passed).map(c => `${c.name}: ${c.reason}`).join('; ')}`,
                 trace: result.path,
-                latency_ms: latency,
+                condition_results: conditionResults,
+                latency_ms: performance.now() - start,
             }
         } catch {
             return {
@@ -98,6 +123,7 @@ export class RuneEngine {
                 status: 'DENY',
                 reason: 'engine error — fail closed',
                 trace: [],
+                condition_results: [],
                 latency_ms: performance.now() - start,
             }
         }

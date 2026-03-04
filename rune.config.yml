@@ -15,6 +15,17 @@ resources:
       viewer:
         actions: [read]
 
+    conditions:
+      office_hours:
+        when:
+          time_between: ["09:00", "17:00"]
+        apply_to: [edit, delete]
+
+      draft_only_edit:
+        when:
+          resource.status: "draft"
+        apply_to: [edit]
+
   project:
     roles:
       admin:
