@@ -33,6 +33,55 @@ function generateTenantId(): string {
 }
 
 export async function setupRoute(fastify: FastifyInstance): Promise<void> {
+
+    // Shared migration logic — drops old constraints that block custom actions/relations
+    async function runMigrations(): Promise<string[]> {
+        const applied: string[] = []
+
+        // Drop old CHECK constraint on tuples.relation (if it exists)
+        // This allows custom relations like 'approver', 'auditor', etc.
+        try {
+            await pool.query(`
+                ALTER TABLE tuples DROP CONSTRAINT IF EXISTS tuples_relation_check
+            `)
+            applied.push('dropped tuples_relation_check constraint')
+        } catch {
+            // Constraint may not exist — safe to ignore
+        }
+
+        // Drop old CHECK constraint on decision_logs.decision (if it exists)
+        try {
+            await pool.query(`
+                ALTER TABLE decision_logs DROP CONSTRAINT IF EXISTS decision_logs_decision_check
+            `)
+            applied.push('dropped decision_logs_decision_check constraint')
+        } catch {
+            // Safe to ignore
+        }
+
+        return applied
+    }
+
+    // POST /v1/migrate — run DB migrations without creating a new tenant
+    fastify.post('/migrate', async (request, reply) => {
+        const setupSecret = process.env['SETUP_SECRET']
+        if (!setupSecret) {
+            return reply.status(503).send({ error: 'SETUP_SECRET env var not set.' })
+        }
+
+        const authHeader = request.headers['authorization']
+        if (!authHeader || authHeader !== `Bearer ${setupSecret}`) {
+            return reply.status(401).send({ error: 'Invalid or missing Authorization header.' })
+        }
+
+        try {
+            const applied = await runMigrations()
+            return reply.status(200).send({ message: '✅ Migrations complete!', applied })
+        } catch (err) {
+            return reply.status(500).send({ error: 'Migration failed', details: (err as Error).message })
+        }
+    })
+
     fastify.post('/setup', async (request, reply) => {
         // Check for SETUP_SECRET authorization
         const setupSecret = process.env['SETUP_SECRET']
@@ -51,6 +100,9 @@ export async function setupRoute(fastify: FastifyInstance): Promise<void> {
         const tenantName = body?.tenantName?.trim() || 'default'
 
         try {
+            // Step 0: Run migrations (drop old constraints)
+            await runMigrations()
+
             // Step 1: Run schema (idempotent)
             const schemaPath = resolve(process.cwd(), 'src/db/schema.sql')
             let schema: string
