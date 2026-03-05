@@ -1,11 +1,31 @@
 # Rune Config
 # Define your authorization model here.
-# This file lives in your repo — version-controlled, code-reviewed, deployed with your app.
+# Each resource can declare an authorization mode:
+#   rebac   (default) — full BFS graph traversal; best for orgs/groups/zones
+#   rbac              — one-hop direct role check; best for flat role assignments
+#   abac              — condition-only check (no tuples); best for IP/time gating
+#   hybrid            — RBAC fast-path, falls back to BFS if no direct role found
 
 version: 1
 
 resources:
+  # ReBAC — full graph traversal: user → group → zone → shipment
+  shipment:
+    mode: rebac
+    roles:
+      owner:
+        actions: [read, edit, delete, manage]
+      editor:
+        inherits: [viewer]
+        actions: [edit]
+      viewer:
+        actions: [read]
+      member:
+        actions: []           # traversal only (group membership)
+
+  # RBAC — fast, one-hop: does user:X have role Y on doc:Z?
   document:
+    mode: rbac
     roles:
       owner:
         actions: [read, edit, delete, share]
@@ -18,7 +38,7 @@ resources:
     conditions:
       office_hours:
         when:
-          time_between: ["09:00", "17:00"]
+          time_between: ["09:00", "17:00"]   # UTC
         apply_to: [edit, delete]
 
       draft_only_edit:
@@ -26,7 +46,19 @@ resources:
           resource.status: "draft"
         apply_to: [edit]
 
+  # ABAC — no relationships needed; pure condition evaluation
+  api_endpoint:
+    mode: abac
+    roles: {}
+    conditions:
+      office_hours:
+        when:
+          time_between: ["09:00", "17:00"]   # UTC
+        apply_to: [read, write]
+
+  # Hybrid — direct role check first (fast); BFS fallback for inherited access
   project:
+    mode: hybrid
     roles:
       admin:
         inherits: [member]
