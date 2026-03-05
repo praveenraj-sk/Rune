@@ -6,14 +6,15 @@
  * 2. Build cache key
  * 3. Check SCT freshness (bypass cache if stale)
  * 4. Check LRU cache → return if cache hit
- * 5. BFS traversal
- * 6. Handle NOT_FOUND (don't cache)
- * 7. Handle limit hits (don't cache)
- * 8. Build explainability (trace, reason, suggested_fix)
- * 9. Get current LVN
- * 10. Cache result (ALLOW and DENY only)
- * 11. Log decision (fire and forget — never await)
- * 12. Return CanResult
+ * 5. Check permission index (O(1) Postgres lookup) → return if index hit
+ * 6. BFS traversal
+ * 7. Handle NOT_FOUND (don't cache)
+ * 8. Handle limit hits (don't cache)
+ * 9. Build explainability (trace, reason, suggested_fix)
+ * 10. Get current LVN
+ * 11. Cache result (ALLOW and DENY only)
+ * 12. Log decision (fire and forget — never await)
+ * 13. Return CanResult
  *
  * FAIL CLOSED: the entire function is wrapped in try/catch.
  * Any unhandled error returns DENY. Code that should be ALLOW
@@ -22,6 +23,7 @@
 import { cache } from '../cache/lru.js'
 import { query } from '../db/client.js'
 import { traverse } from '../bfs/traverse.js'
+import { checkIndex } from '../db/permission-index.js'
 import { buildTrace, buildReason, buildSuggestedFix } from './explain.js'
 import { logger } from '../logger/index.js'
 import { makeDenyResult, type CanInput, type CanResult } from './types.js'
@@ -54,6 +56,7 @@ export async function can(input: CanInput): Promise<CanResult> {
                     trace: [],
                     suggested_fix: [],
                     cache_hit: true,
+                    index_hit: false,
                     latency_ms: performance.now() - start,
                     sct: { lvn },
                 }
@@ -62,7 +65,28 @@ export async function can(input: CanInput): Promise<CanResult> {
             }
         }
 
-        // Step 5: BFS traversal
+        // Step 5: Permission index — O(1) Postgres lookup before BFS
+        const indexHit = await checkIndex(input.tenantId, input.subject, input.action, input.object)
+        if (indexHit) {
+            const lvn = await getCurrentLvn()
+            const result: CanResult = {
+                decision: 'allow',
+                status: 'ALLOW',
+                reason: 'allowed via permission index',
+                trace: [],
+                suggested_fix: [],
+                cache_hit: false,
+                index_hit: true,
+                latency_ms: performance.now() - start,
+                sct: { lvn },
+            }
+            // Cache this hit so subsequent checks are LRU-served
+            cache.set(cacheKey, { decision: 'allow', lvn })
+            logDecision(input, result)
+            return result
+        }
+
+        // Step 6: BFS traversal
         const traversal = await traverse(input.tenantId, input.subject, input.object, input.action)
 
         // Step 6: NOT_FOUND — object doesn't exist in tuple store
@@ -75,12 +99,13 @@ export async function can(input: CanInput): Promise<CanResult> {
                 trace: [],
                 suggested_fix: [],
                 cache_hit: false,
+                index_hit: false,
                 latency_ms: performance.now() - start,
                 sct: { lvn },
             }
         }
 
-        // Step 7: Limit hit — don't cache, return DENY
+        // Step 8: Limit hit — don't cache, return DENY
         if (traversal.limitHit !== null) {
             const lvn = await getCurrentLvn()
             return {
@@ -90,6 +115,7 @@ export async function can(input: CanInput): Promise<CanResult> {
                 trace: buildTrace(traversal.path, false),
                 suggested_fix: [],
                 cache_hit: false,
+                index_hit: false,
                 latency_ms: performance.now() - start,
                 sct: { lvn },
             }
@@ -118,6 +144,7 @@ export async function can(input: CanInput): Promise<CanResult> {
             trace,
             suggested_fix: suggestedFix,
             cache_hit: false,
+            index_hit: false,
             latency_ms: performance.now() - start,
             sct: { lvn },
         }

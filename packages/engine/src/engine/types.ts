@@ -23,6 +23,8 @@ export type CanResult = {
     trace: TraceNode[]
     suggested_fix: string[]
     cache_hit: boolean
+    /** True when result was served from the materialised permission index (no BFS needed) */
+    index_hit: boolean
     latency_ms: number
     sct: { lvn: number }
 }
@@ -39,6 +41,7 @@ export function makeDenyResult(reason: string, lvn = 0): CanResult {
         trace: [],
         suggested_fix: [],
         cache_hit: false,
+        index_hit: false,
         latency_ms: 0,
         sct: { lvn },
     }

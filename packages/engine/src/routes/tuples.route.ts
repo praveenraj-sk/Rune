@@ -14,6 +14,8 @@ import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { cache } from '../cache/lru.js'
 import { query } from '../db/client.js'
 import { logger } from '../logger/index.js'
+import { indexGrant, removeGrant } from '../db/permission-index.js'
+import { getValidRelations, extractResourceType } from '../policy/config.js'
 
 const bodySchema = {
     type: 'object',
@@ -110,6 +112,13 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
             // Wipe all cached decisions for this tenant — any permission may have changed
             cache.deleteByTenant(tenantId)
 
+            // Update permission index — fire-and-forget (never blocks response)
+            const resourceType = extractResourceType(object)
+            const allActions = ['read', 'edit', 'delete', 'manage', 'write', 'approve']
+            const grantedActions = allActions.filter(a => getValidRelations(a, resourceType).includes(relation))
+            indexGrant(tenantId, subject, relation, object, grantedActions)
+                .catch((err: unknown) => logger.warn({ err }, 'perm_index_grant_async_failed'))
+
             logger.info({ tenantId, subject, relation, object, lvn }, 'tuple_added')
             return reply.status(200).send({ success: true, lvn })
 
@@ -142,6 +151,10 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
 
             // Wipe tenant cache after every write
             cache.deleteByTenant(tenantId)
+
+            // Clean up permission index for this specific tuple — fire-and-forget
+            removeGrant(tenantId, subject, relation, object)
+                .catch((err: unknown) => logger.warn({ err }, 'perm_index_remove_async_failed'))
 
             logger.info({ tenantId, subject, relation, object, lvn }, 'tuple_removed')
             return reply.status(200).send({ success: true, lvn })
