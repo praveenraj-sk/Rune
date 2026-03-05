@@ -288,6 +288,7 @@ function switchTab(name) {
     if (name === 'relationships') loadTuples(currentPage, currentSearch);
     if (name === 'logs') loadLogs();
     if (name === 'settings') loadSettings();
+    if (name === 'graph') loadGraph();
 }
 
 /* ── Helpers ── */
@@ -296,3 +297,215 @@ function timeAgo(d) { const s = (Date.now() - new Date(d).getTime()) / 1000; if 
 
 /* ── Auto Refresh ── */
 setInterval(() => { if (API_KEY && document.getElementById('panel-overview').classList.contains('active')) { loadStats(); loadRecentLogs() } }, 10000);
+
+/* ── Graph Visualizer ── */
+let graphData = null;
+let graphTranslate = { x: 0, y: 0 }, graphScale = 1, graphDragOrigin = null, graphDragTranslate = null;
+
+const NODE_COLORS = { user: '#6366f1', group: '#10b981', zone: '#f59e0b', resource: '#3b82f6' };
+function nodeColor(type) { return NODE_COLORS[type] || '#8b5cf6'; }
+
+async function loadGraph(search) {
+    const svg = document.getElementById('graphSvg');
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#94a3b8" dy="0.35em" font-size="14">Loading graph…</text>';
+    document.getElementById('graphEmpty').style.display = 'none';
+    document.getElementById('graphStats').textContent = '';
+    try {
+        const url = '/v1/graph' + (search ? '?search=' + encodeURIComponent(search) : '');
+        const data = await api('GET', url);
+        graphData = data;
+        if (!data.nodes || data.nodes.length === 0) {
+            svg.innerHTML = '';
+            document.getElementById('graphEmpty').style.display = 'flex';
+        } else {
+            renderForceGraph(data);
+            document.getElementById('graphStats').textContent =
+                data.total_nodes + ' nodes · ' + data.total_edges + ' edges' +
+                (search ? ' · filtered: ' + search : '');
+        }
+    } catch (e) {
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#ef4444" dy="0.35em" font-size="14">Failed to load graph: ' + esc(e.message) + '</text>';
+    }
+}
+
+function searchGraph() {
+    const s = document.getElementById('graphSearch').value.trim();
+    if (s) loadGraph(s);
+}
+function resetGraph() {
+    document.getElementById('graphSearch').value = '';
+    loadGraph();
+}
+
+function renderForceGraph(data) {
+    const container = document.getElementById('graphSvg').parentElement;
+    const W = container.clientWidth || 800, H = Math.max(480, container.clientHeight || 560);
+    const svg = document.getElementById('graphSvg');
+    svg.setAttribute('width', W); svg.setAttribute('height', H);
+    svg.innerHTML = '';
+
+    // ── Force layout (simple spring-electrical) ──────────────────────
+    const nodes = data.nodes.map((n, i) => ({
+        ...n,
+        x: W / 2 + (Math.random() - 0.5) * 300,
+        y: H / 2 + (Math.random() - 0.5) * 300,
+        vx: 0, vy: 0,
+    }));
+    const nodeById = {};
+    nodes.forEach(n => { nodeById[n.id] = n; });
+
+    const edges = data.edges.map(e => ({
+        ...e,
+        source: nodeById[e.source],
+        target: nodeById[e.target],
+    })).filter(e => e.source && e.target);
+
+    // Simulate spring forces
+    for (let iter = 0; iter < 120; iter++) {
+        // Repulsion
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+                const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+                const force = 6000 / (dist * dist);
+                const fx = (dx / dist) * force, fy = (dy / dist) * force;
+                nodes[i].vx += fx; nodes[i].vy += fy;
+                nodes[j].vx -= fx; nodes[j].vy -= fy;
+            }
+        }
+        // Attraction (spring)
+        edges.forEach(e => {
+            const dx = e.target.x - e.source.x, dy = e.target.y - e.source.y;
+            const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+            const force = (dist - 120) * 0.05;
+            const fx = (dx / dist) * force, fy = (dy / dist) * force;
+            e.source.vx += fx; e.source.vy += fy;
+            e.target.vx -= fx; e.target.vy -= fy;
+        });
+        // Center gravity
+        nodes.forEach(n => {
+            n.vx += (W / 2 - n.x) * 0.008;
+            n.vy += (H / 2 - n.y) * 0.008;
+        });
+        // Apply velocity + damping
+        nodes.forEach(n => {
+            n.x += n.vx * 0.6; n.y += n.vy * 0.6;
+            n.vx *= 0.5; n.vy *= 0.5;
+            n.x = Math.max(30, Math.min(W - 30, n.x));
+            n.y = Math.max(30, Math.min(H - 30, n.y));
+        });
+    }
+
+    // ── SVG elements ─────────────────────────────────────────────────
+    const ns = 'http://www.w3.org/2000/svg';
+
+    // Arrow marker
+    const defs = document.createElementNS(ns, 'defs');
+    const marker = document.createElementNS(ns, 'marker');
+    marker.setAttribute('id', 'arrow'); marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '20'); marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z'); path.setAttribute('fill', '#94a3b8');
+    marker.appendChild(path); defs.appendChild(marker); svg.appendChild(defs);
+
+    // Pan/zoom group
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('id', 'graphScene');
+    g.setAttribute('transform', 'translate(0,0) scale(1)');
+    svg.appendChild(g);
+
+    // Edges
+    edges.forEach(e => {
+        const line = document.createElementNS(ns, 'line');
+        line.setAttribute('x1', e.source.x); line.setAttribute('y1', e.source.y);
+        line.setAttribute('x2', e.target.x); line.setAttribute('y2', e.target.y);
+        line.setAttribute('stroke', '#cbd5e1'); line.setAttribute('stroke-width', '1.5');
+        line.setAttribute('marker-end', 'url(#arrow)');
+        g.appendChild(line);
+
+        // Edge label
+        const mx = (e.source.x + e.target.x) / 2, my = (e.source.y + e.target.y) / 2;
+        const label = document.createElementNS(ns, 'text');
+        label.setAttribute('x', mx); label.setAttribute('y', my - 4);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('font-size', '10'); label.setAttribute('fill', '#94a3b8');
+        label.setAttribute('font-family', 'Inter,sans-serif');
+        label.textContent = e.relation;
+        g.appendChild(label);
+    });
+
+    // Nodes
+    nodes.forEach(n => {
+        const nodeG = document.createElementNS(ns, 'g');
+        nodeG.style.cursor = 'pointer';
+
+        const circle = document.createElementNS(ns, 'circle');
+        circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', '14');
+        circle.setAttribute('fill', nodeColor(n.type));
+        circle.setAttribute('stroke', '#fff'); circle.setAttribute('stroke-width', '2');
+        nodeG.appendChild(circle);
+
+        const label = document.createElementNS(ns, 'text');
+        label.setAttribute('x', n.x); label.setAttribute('y', n.y + 26);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('font-size', '11'); label.setAttribute('fill', '#475569');
+        label.setAttribute('font-family', 'Inter,sans-serif');
+        // Truncate long IDs
+        const display = n.id.length > 18 ? n.id.slice(0, 16) + '…' : n.id;
+        label.textContent = display;
+        nodeG.appendChild(label);
+
+        // Hover effect
+        circle.addEventListener('mouseenter', () => circle.setAttribute('r', '18'));
+        circle.addEventListener('mouseleave', () => circle.setAttribute('r', '14'));
+
+        // Click → show node detail
+        nodeG.addEventListener('click', () => showNodeDetail(n, edges));
+
+        g.appendChild(nodeG);
+    });
+
+    // ── Pan + zoom ────────────────────────────────────────────────────
+    graphTranslate = { x: 0, y: 0 }; graphScale = 1;
+
+    svg.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        graphScale = Math.max(0.3, Math.min(3, graphScale * (e.deltaY < 0 ? 1.1 : 0.9)));
+        updateGraphTransform();
+    }, { passive: false });
+
+    svg.addEventListener('mousedown', (e) => {
+        graphDragOrigin = { x: e.clientX, y: e.clientY };
+        graphDragTranslate = { ...graphTranslate };
+    });
+    svg.addEventListener('mousemove', (e) => {
+        if (!graphDragOrigin) return;
+        graphTranslate.x = graphDragTranslate.x + (e.clientX - graphDragOrigin.x);
+        graphTranslate.y = graphDragTranslate.y + (e.clientY - graphDragOrigin.y);
+        updateGraphTransform();
+    });
+    svg.addEventListener('mouseup', () => { graphDragOrigin = null; });
+    svg.addEventListener('mouseleave', () => { graphDragOrigin = null; });
+}
+
+function updateGraphTransform() {
+    const scene = document.getElementById('graphScene');
+    if (scene) scene.setAttribute('transform', `translate(${graphTranslate.x},${graphTranslate.y}) scale(${graphScale})`);
+}
+
+function showNodeDetail(node, edges) {
+    const panel = document.getElementById('graphNodePanel');
+    document.getElementById('graphNodeTitle').textContent = node.id;
+    document.getElementById('graphNodeType').textContent = 'Type: ' + node.type;
+    const outgoing = edges.filter(e => e.source.id === node.id);
+    const incoming = edges.filter(e => e.target.id === node.id);
+    let html = '';
+    if (outgoing.length) html += '<div style="font-weight:600;font-size:12px;margin-bottom:4px">Outgoing</div>' + outgoing.map(e => `<div style="font-size:12px;color:#64748b">→ <b>${esc(e.relation)}</b> → ${esc(e.target.id)}</div>`).join('');
+    if (incoming.length) html += '<div style="font-weight:600;font-size:12px;margin:6px 0 4px">Incoming</div>' + incoming.map(e => `<div style="font-size:12px;color:#64748b">${esc(e.source.id)} → <b>${esc(e.relation)}</b> →</div>`).join('');
+    if (!outgoing.length && !incoming.length) html = '<div style="font-size:12px;color:#94a3b8">No connections</div>';
+    document.getElementById('graphNodeRelations').innerHTML = html;
+    panel.style.display = 'block';
+}
+

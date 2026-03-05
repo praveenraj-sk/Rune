@@ -77,6 +77,18 @@
           </svg>
           <span>Debugger</span>
         </a>
+        <a class="nav-item" onclick="switchTab('graph')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="5" cy="12" r="2" />
+            <circle cx="19" cy="5" r="2" />
+            <circle cx="19" cy="19" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <line x1="7" y1="12" x2="10" y2="12" />
+            <line x1="14" y1="12" x2="17" y2="6" />
+            <line x1="14" y1="12" x2="17" y2="18" />
+          </svg>
+          <span>Graph</span>
+        </a>
 
         <div class="sidebar-section">System</div>
         <a class="nav-item" onclick="switchTab('settings')">
@@ -293,6 +305,45 @@
             <div class="settings-row"><span class="settings-label">Cache Capacity</span><span class="settings-value"
                 id="settingsCacheMax"></span></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Graph Visualizer -->
+      <div class="panel" id="panel-graph">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Relationship Graph</h1>
+            <p class="page-subtitle">Visual map of all entity relationships in your tenant</p>
+          </div>
+          <button class="btn btn-sm" onclick="loadGraph()">↺ Refresh</button>
+        </div>
+        <div class="page-content">
+          <div class="graph-toolbar">
+            <input type="text" id="graphSearch" placeholder="Search node (e.g. user:arjun)" class="graph-search-input">
+            <button class="btn btn-sm" onclick="searchGraph()">Find</button>
+            <button class="btn-ghost btn-sm" onclick="resetGraph()">Show All</button>
+            <span class="graph-legend">
+              <span class="legend-dot" style="background:#6366f1"></span>user
+              <span class="legend-dot" style="background:#10b981"></span>group
+              <span class="legend-dot" style="background:#f59e0b"></span>zone
+              <span class="legend-dot" style="background:#3b82f6"></span>resource
+              <span class="legend-dot" style="background:#8b5cf6"></span>other
+            </span>
+          </div>
+          <div class="graph-container">
+            <svg id="graphSvg" class="graph-svg"></svg>
+            <div class="graph-empty" id="graphEmpty">
+              <p>No relationships found. Add some tuples to see the graph.</p>
+            </div>
+            <div class="graph-node-panel" id="graphNodePanel" style="display:none">
+              <div class="graph-node-title" id="graphNodeTitle"></div>
+              <div class="graph-node-type" id="graphNodeType"></div>
+              <div class="graph-node-relations" id="graphNodeRelations"></div>
+              <button class="btn-ghost btn-sm" style="margin-top:8px"
+                onclick="document.getElementById('graphNodePanel').style.display='none'">✕ Close</button>
+            </div>
+          </div>
+          <div class="graph-stats" id="graphStats"></div>
         </div>
       </div>
     </div>

@@ -18,6 +18,7 @@ import { healthRoute } from './routes/health.route.js'
 import { setupRoute } from './routes/setup.route.js'
 import { statsRoute } from './routes/stats.route.js'
 import { adminRoute } from './routes/admin.route.js'
+import { graphRoute } from './routes/graph.route.js'
 import { errorHandler } from './middleware/error-handler.js'
 import { loadPolicy } from './policy/config.js'
 
@@ -34,6 +35,8 @@ fastify.register(healthRoute, { prefix: '/v1' })
 fastify.register(setupRoute, { prefix: '/v1' })
 fastify.register(statsRoute, { prefix: '/v1' })
 fastify.register(adminRoute, { prefix: '/v1' })
+fastify.register(graphRoute, { prefix: '/v1' })
+
 
 // Start server
 const start = async () => {

@@ -761,3 +761,97 @@ tr:hover td { background: var(--gray-50) }
   .stats-grid { grid-template-columns: repeat(2, 1fr) }
   .page-content { padding: 16px }
 }
+
+/* ── Graph Visualizer ── */
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.graph-search-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--gray-700);
+  background: var(--white);
+}
+.graph-search-input:focus { outline: none; border-color: var(--indigo-400); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.graph-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  margin-left: auto;
+}
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+.graph-container {
+  position: relative;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: 520px;
+}
+.graph-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+.graph-svg:active { cursor: grabbing; }
+.graph-empty {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-400);
+  font-size: 0.9rem;
+}
+.graph-node-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 220px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  z-index: 10;
+}
+.graph-node-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--gray-800);
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+.graph-node-type {
+  font-size: 0.78rem;
+  color: var(--indigo-600);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.graph-node-relations { max-height: 200px; overflow-y: auto; }
+.graph-stats {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--gray-400);
+  text-align: right;
+}
