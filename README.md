@@ -98,7 +98,7 @@ pnpm dev
 ## SDK Usage
 
 ```bash
-npm install @runeauth/sdk
+npm install @runeauth/sdk   # v2.2.2 (latest)
 ```
 
 ```ts

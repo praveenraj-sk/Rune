@@ -4,7 +4,7 @@ Comprehensive guide to using the Rune SDK in your applications.
 
 Install:
 ```bash
-npm install @runeauth/sdk
+npm install @runeauth/sdk   # v2.2.2
 ```
 
 Requires **Node.js ≥ 18**. Zero external dependencies.

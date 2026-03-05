@@ -1,9 +1,9 @@
-# @runeauth/sdk
+# @runeauth/sdk &nbsp;·&nbsp; `v2.2.2`
 
 Zero-dependency Node.js client for [Rune](https://github.com/praveenraj-sk/Rune) — a relationship-based authorization engine (ReBAC).
 
 ```bash
-npm install @runeauth/sdk
+npm install @runeauth/sdk   # v2.2.2
 ```
 
 Requires **Node.js ≥ 18**.
