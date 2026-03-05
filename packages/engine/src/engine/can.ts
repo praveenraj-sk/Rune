@@ -148,6 +148,21 @@ export async function can(input: CanInput): Promise<CanResult> {
             latency_ms: performance.now() - start,
             sct: { lvn },
         }
+
+        // Slow authorization warning — flag requests exceeding threshold for debugging
+        const SLOW_THRESHOLD_MS = 20
+        if (result.latency_ms > SLOW_THRESHOLD_MS) {
+            logger.warn({
+                subject: input.subject,
+                action: input.action,
+                object: input.object,
+                tenantId: input.tenantId,
+                latency_ms: result.latency_ms.toFixed(2),
+                bfs_depth: traversal.depthReached,
+                bfs_nodes: traversal.nodeCount,
+            }, 'slow_authorization_decision')
+        }
+
         logDecision(input, result)
         return result
 

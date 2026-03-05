@@ -67,6 +67,7 @@ export { RuneClient, RuneError } from './client.js'
 export { createProtectMiddleware } from './middleware.js'
 export type {
     RuneOptions,
+    CacheStrategy,
     Permission,
     Grant,
     GrantResult,

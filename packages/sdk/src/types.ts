@@ -5,6 +5,18 @@
  * Naming convention: "What IS it?" — plain English nouns, no jargon.
  */
 
+/**
+ * Controls which decision types are cached client-side.
+ *
+ * - `allow_and_deny` (default) — both ALLOW and DENY cached. Fast, but leaves a
+ *   30s window where revoked users still appear to have access.
+ * - `deny_only` — only DENY results cached. ALLOW always hits the server.
+ *   Recommended for security-sensitive resources (financial, medical).
+ * - `none` — client cache completely disabled for this client.
+ *   Use for zero-tolerance revocation (access stops the instant a tuple is removed).
+ */
+export type CacheStrategy = 'allow_and_deny' | 'deny_only' | 'none'
+
 /** Options passed when creating a new Rune client */
 export type RuneOptions = {
     apiKey: string
@@ -33,6 +45,14 @@ export type RuneOptions = {
         maxSize?: number
         /** Time-to-live in ms for cached decisions. Default: 30000 (30s) */
         ttl?: number
+        /**
+         * Which decisions to cache client-side.
+         *
+         * - `allow_and_deny` (default) — cache both. 30s window where revoked access still works.
+         * - `deny_only` — ALLOW not cached; safer for security-sensitive apps.
+         * - `none` — cache disabled; every check hits the server. Use for zero-tolerance revocation.
+         */
+        strategy?: CacheStrategy
     }
 }
 

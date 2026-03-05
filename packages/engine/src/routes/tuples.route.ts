@@ -12,7 +12,7 @@ import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { cache } from '../cache/lru.js'
-import { query } from '../db/client.js'
+import { query, getClient } from '../db/client.js'
 import { logger } from '../logger/index.js'
 import { indexGrant, removeGrant } from '../db/permission-index.js'
 import { getValidRelations, extractResourceType } from '../policy/config.js'
@@ -96,18 +96,31 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
         const tenantId = request.tenantId
 
         try {
-            // Get next LVN — every write gets a unique monotone version number
-            const lvnResult = await query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-            const lvn = parseInt(lvnResult.rows[0]?.nextval ?? '1', 10)
+            const client = await getClient()
+            let lvn: number
+            try {
+                await client.query('BEGIN')
 
-            // Upsert — idempotent
-            await query(
-                `INSERT INTO tuples (tenant_id, subject, relation, object, lvn)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (tenant_id, subject, relation, object)
-         DO UPDATE SET lvn = EXCLUDED.lvn`,
-                [tenantId, subject, relation, object, lvn]
-            )
+                // Get next LVN and insert tuple atomically — prevents partial writes
+                const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
+                lvn = parseInt(lvnResult.rows[0]?.nextval ?? '1', 10)
+
+                // Upsert — idempotent
+                await client.query(
+                    `INSERT INTO tuples (tenant_id, subject, relation, object, lvn)
+                     VALUES ($1, $2, $3, $4, $5)
+                     ON CONFLICT (tenant_id, subject, relation, object)
+                     DO UPDATE SET lvn = EXCLUDED.lvn`,
+                    [tenantId, subject, relation, object, lvn]
+                )
+
+                await client.query('COMMIT')
+            } catch (err) {
+                await client.query('ROLLBACK').catch(() => { })
+                throw err
+            } finally {
+                client.release()
+            }
 
             // Wipe all cached decisions for this tenant — any permission may have changed
             cache.deleteByTenant(tenantId)
@@ -137,17 +150,30 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
         const tenantId = request.tenantId
 
         try {
-            await query(
-                `DELETE FROM tuples
-         WHERE tenant_id = $1
-           AND subject   = $2
-           AND relation  = $3
-           AND object    = $4`,
-                [tenantId, subject, relation, object]
-            )
+            const client = await getClient()
+            let lvn: number
+            try {
+                await client.query('BEGIN')
 
-            const lvnResult = await query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-            const lvn = parseInt(lvnResult.rows[0]?.nextval ?? '1', 10)
+                await client.query(
+                    `DELETE FROM tuples
+                     WHERE tenant_id = $1
+                       AND subject   = $2
+                       AND relation  = $3
+                       AND object    = $4`,
+                    [tenantId, subject, relation, object]
+                )
+
+                const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
+                lvn = parseInt(lvnResult.rows[0]?.nextval ?? '1', 10)
+
+                await client.query('COMMIT')
+            } catch (err) {
+                await client.query('ROLLBACK').catch(() => { })
+                throw err
+            } finally {
+                client.release()
+            }
 
             // Wipe tenant cache after every write
             cache.deleteByTenant(tenantId)

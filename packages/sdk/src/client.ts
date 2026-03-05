@@ -8,7 +8,7 @@
  * - Retry with exponential backoff (configurable)
  * - Circuit breaker pattern (configurable)
  */
-import type { RuneOptions, Permission, Grant, GrantResult, AuditLog, HealthStatus } from './types.js'
+import type { RuneOptions, CacheStrategy, Permission, Grant, GrantResult, AuditLog, HealthStatus } from './types.js'
 import { LocalCache } from './cache.js'
 
 // ── Circuit Breaker State ────────────────────────────────────────────────────
@@ -65,6 +65,7 @@ class CircuitBreaker {
 export class RuneClient {
     private readonly circuit: CircuitBreaker | null
     private readonly localCache: LocalCache | null
+    private readonly cacheStrategy: CacheStrategy
     private readonly retryAttempts: number
     private readonly retryBaseDelay: number
     private readonly retryMaxDelay: number
@@ -102,8 +103,10 @@ export class RuneClient {
             if (config.cache.maxSize !== undefined) cacheOpts.maxSize = config.cache.maxSize
             if (config.cache.ttl !== undefined) cacheOpts.ttl = config.cache.ttl
             this.localCache = new LocalCache(cacheOpts)
+            this.cacheStrategy = config.cache.strategy ?? 'allow_and_deny'
         } else {
             this.localCache = null
+            this.cacheStrategy = 'none'
         }
     }
 
@@ -227,35 +230,45 @@ export class RuneClient {
         tenant?: string
         sct?: { lvn: number }
     }): Promise<Permission> {
-        // Check local cache first (if enabled)
-        if (this.localCache) {
+        // Check local cache first — only if strategy allows reading cached decisions
+        if (this.localCache && this.cacheStrategy !== 'none') {
             const key = LocalCache.buildKey(params.subject, params.action, params.object)
             const cached = this.localCache.get(key, params.sct?.lvn)
             if (cached) {
-                // Return a full Permission object from the cached subset
-                return {
-                    decision: cached.decision,
-                    status: cached.status,
-                    reason: cached.reason + ' (sdk-cache)',
-                    trace: [],
-                    suggested_fix: [],
-                    cache_hit: true,
-                    latency_ms: 0,
-                    sct: { lvn: params.sct?.lvn ?? 0 },
-                } as Permission
+                // deny_only strategy: skip if this was a cached ALLOW (only DENY is allowed in cache)
+                const isAllowHit = cached.decision === 'allow'
+                if (!isAllowHit || this.cacheStrategy === 'allow_and_deny') {
+                    return {
+                        decision: cached.decision,
+                        status: cached.status,
+                        reason: cached.reason + ' (sdk-cache)',
+                        trace: [],
+                        suggested_fix: [],
+                        cache_hit: true,
+                        latency_ms: 0,
+                        sct: { lvn: params.sct?.lvn ?? 0 },
+                    } as Permission
+                }
             }
         }
 
         const result = await this.request<Permission>('POST', '/v1/can', params)
 
-        // Store in local cache (if enabled)
-        if (this.localCache && (result.status === 'ALLOW' || result.status === 'DENY')) {
-            const key = LocalCache.buildKey(params.subject, params.action, params.object)
-            this.localCache.set(
-                key,
-                { decision: result.decision, status: result.status, reason: result.reason },
-                result.sct?.lvn ?? 0,
-            )
+        // Store in local cache based on strategy
+        if (this.localCache && result.status !== 'NOT_FOUND') {
+            const shouldCacheDeny = this.cacheStrategy === 'deny_only' || this.cacheStrategy === 'allow_and_deny'
+            const shouldCacheAllow = this.cacheStrategy === 'allow_and_deny'
+            const isDeny = result.status === 'DENY'
+            const isAllow = result.status === 'ALLOW'
+
+            if ((isDeny && shouldCacheDeny) || (isAllow && shouldCacheAllow)) {
+                const key = LocalCache.buildKey(params.subject, params.action, params.object)
+                this.localCache.set(
+                    key,
+                    { decision: result.decision, status: result.status, reason: result.reason },
+                    result.sct?.lvn ?? 0,
+                )
+            }
         }
 
         return result
