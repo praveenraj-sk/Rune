@@ -29,7 +29,7 @@ export { traverse } from './bfs.js'
 export type { TraversalResult, BfsOptions } from './bfs.js'
 
 export { loadPolicy, getValidRelationsFromPolicy } from './policy.js'
-export type { ResolvedPolicy, RuneConfig, RoleDefinition, ResourceDefinition, ConditionDef } from './policy.js'
+export type { ResolvedPolicy, RuneConfig, RoleDefinition, ResourceDefinition, ConditionDef, ResourceMode } from './policy.js'
 
 export { evaluateConditions, allConditionsPassed } from './conditions.js'
 export type { EvalContext, ConditionResult } from './conditions.js'
@@ -38,3 +38,6 @@ export { SqlDataSource } from './datasource/sql.js'
 export type { DataSource, DataSourceConfig, DataSourceMapping, ExternalTuple } from './datasource/types.js'
 
 export { HybridStore } from './hybrid.js'
+
+export { evalRbac } from './evaluators/rbac.js'
+export type { RbacResult } from './evaluators/rbac.js'

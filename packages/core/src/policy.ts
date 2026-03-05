@@ -16,7 +16,18 @@ export type ConditionDef = {
     apply_to: string[]
 }
 
+/**
+ * Authorization execution mode for a resource.
+ *
+ * - `rebac`  (default) — Full BFS graph traversal. Best for hierarchical orgs.
+ * - `rbac`   — One-hop direct role check (no BFS). Best for flat role assignments.
+ * - `abac`   — Condition-only check (no tuples at all). Best for IP/time gating.
+ * - `hybrid` — Fast-path RBAC first; falls back to BFS if no direct role found.
+ */
+export type ResourceMode = 'rebac' | 'rbac' | 'abac' | 'hybrid'
+
 export type ResourceDefinition = {
+    mode?: ResourceMode
     roles: Record<string, RoleDefinition>
     conditions?: Record<string, ConditionDef>
 }
@@ -29,6 +40,7 @@ export type RuneConfig = {
 export type ResolvedPolicy = {
     resources: Record<string, {
         name: string
+        mode: ResourceMode
         roles: Record<string, { name: string; actions: string[]; resolvedActions: string[]; inherits: string[] }>
         actionToRoles: Record<string, string[]>
         conditions?: Record<string, ConditionDef>
@@ -90,7 +102,12 @@ function resolve(config: RuneConfig): ResolvedPolicy {
             }
         }
 
-        resources[resName] = { name: resName, roles: resolvedRoles, actionToRoles, conditions: resDef.conditions }
+        const mode: ResourceMode = resDef.mode ?? 'rebac'
+        if (!['rebac', 'rbac', 'abac', 'hybrid'].includes(mode)) {
+            throw new Error(`resource "${resName}": unknown mode "${mode}". Must be rebac | rbac | abac | hybrid`)
+        }
+
+        resources[resName] = { name: resName, mode, roles: resolvedRoles, actionToRoles, conditions: resDef.conditions }
     }
 
     return { resources }
@@ -124,6 +141,7 @@ function getDefaultPolicy(): ResolvedPolicy {
         version: 1,
         resources: {
             default: {
+                mode: 'rebac',
                 roles: {
                     owner: { actions: ['read', 'edit', 'delete', 'manage'] },
                     editor: { inherits: ['viewer'], actions: ['edit'] },
