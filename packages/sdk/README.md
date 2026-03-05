@@ -162,10 +162,11 @@ const { logs } = await rune.logs()
 
 ```ts
 const health = await rune.health()
-// { status: 'ok' | 'degraded', db: 'connected' | 'error', timestamp: string }
+// { status: 'ok', db: 'connected', timestamp: string }
+// { status: 'degraded', db: 'error', timestamp: string }  ← Postgres is down
 ```
 
----
+Uses the same timeout and circuit-breaker as all other SDK calls. If the engine doesn't respond within the configured `timeout`, a `RuneError` with `statusCode: 408` is thrown.
 
 ## Real-world Example — Express middleware
 
@@ -207,8 +208,12 @@ try {
   const permission = await rune.can('user:arjun').do('read').on('shipment:TN001')
 } catch (err) {
   if (err instanceof RuneError) {
-    console.error(err.statusCode) // 401, 403, 500...
+    console.error(err.statusCode) // 401, 403, 408, 429, 500...
     console.error(err.message)    // human readable
+    // 401 → invalid or missing API key
+    // 408 → request timed out (engine unreachable or too slow)
+    // 429 → rate limit exceeded — back off and retry after a short delay
+    // 500 → engine internal error
   }
 }
 ```

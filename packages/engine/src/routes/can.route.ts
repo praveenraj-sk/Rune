@@ -8,6 +8,7 @@
 import type { FastifyInstance } from 'fastify'
 import { can } from '../engine/can.js'
 import { authMiddleware } from '../middleware/auth.js'
+import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import type { CanInput } from '../engine/types.js'
 
 const bodySchema = {
@@ -32,7 +33,7 @@ type CanBody = {
 
 export async function canRoute(fastify: FastifyInstance): Promise<void> {
     fastify.post<{ Body: CanBody }>('/can', {
-        preHandler: authMiddleware,
+        preHandler: [authMiddleware, rateLimitMiddleware],
         schema: { body: bodySchema },
     }, async (request, reply) => {
         const body = request.body

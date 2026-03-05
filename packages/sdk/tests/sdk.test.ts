@@ -244,4 +244,27 @@ describe('Timeout and connection errors', () => {
         expect(err.statusCode).toBe(408)
         expect(err.message).toContain('timed out')
     })
+
+    test('health() throws RuneError with 408 when server hangs', async () => {
+        // Create a server that accepts connections but never responds
+        const { createServer } = await import('http')
+        const hangServer = createServer((_req, _res) => { /* intentionally no response */ })
+        const hangUrl = await new Promise<string>(resolve => {
+            hangServer.listen(0, '127.0.0.1', () => {
+                const addr = hangServer.address() as { port: number }
+                resolve(`http://127.0.0.1:${addr.port}`)
+            })
+        })
+
+        try {
+            const rune = new Rune({ apiKey: 'test-key', baseUrl: hangUrl, timeout: 200 })
+            await expect(rune.health()).rejects.toMatchObject({
+                name: 'RuneError',
+                statusCode: 408,
+            })
+        } finally {
+            hangServer.close()
+        }
+    })
 })
+

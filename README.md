@@ -22,10 +22,12 @@
 
 
 - **BFS graph traversal** — permissions flow through relationships (`user → group → zone → resource`)
-- **Instant decisions** — median latency < 5ms with in-process LRU cache
+- **Instant decisions** — median latency < 5ms with in-process LRU cache (O(k) per-tenant invalidation)
 - **Full explainability** — every decision includes a trace, reason, and suggested fix
 - **Tenant-isolated** — every tenant's data is completely separated at the DB level
 - **Fail-closed** — any error returns DENY, never ALLOW
+- **Admin dashboard** — protected by a dedicated admin API key (`ADMIN_API_KEY`)
+- **Rate limiting** — sliding window per API key, configurable via env vars
 
 ---
 
@@ -251,6 +253,8 @@ user:arjun  --[member]-->  group:chennai_managers
 ## Security
 
 - **API keys** are hashed with SHA-256 before storage — raw keys never hit the DB
+- **Admin dashboard** (`/admin`) requires a separate `ADMIN_API_KEY` — regular API keys cannot access it. Leave `ADMIN_API_KEY` unset to disable the dashboard entirely.
+- **Rate limiting** — all `/v1/*` routes enforce a sliding window per authenticated API key. Default: 100 requests per 10 seconds. Configure with `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS`.
 - **Tenant isolation** — every query is scoped to `tenant_id`, no cross-tenant leakage
 - **Fail-closed** — service errors return DENY, not ALLOW
 - **BFS limits** — max depth 20, max nodes 1000 — protects against graph bombs
@@ -264,19 +268,20 @@ rune/
 ├── packages/
 │   ├── engine/          # Fastify API server (TypeScript)
 │   │   └── src/
-│   │       ├── env-setup.ts # Loads .env (ESM-safe, runs before config)
-│   │       ├── server.ts    # Entry point
-│   │       ├── bfs/     # BFS graph traversal
-│   │       ├── cache/   # LRU cache with tenant isolation
-│   │       ├── config/  # Env validation (Zod)
-│   │       ├── db/      # Postgres pool + schema
-│   │       ├── engine/  # can() decision function + explainability
-│   │       ├── logger/  # Pino structured logging
-│   │       ├── middleware/ # Auth + error handler
-│   │       └── routes/  # POST /can, /tuples, GET /health, /logs
-│   └── sdk/             # @runeauth/sdk (zero dependencies)
+│   │       ├── env-setup.ts   # Loads .env (ESM-safe, runs before config)
+│   │       ├── server.ts      # Entry point
+│   │       ├── bfs/           # BFS graph traversal
+│   │       ├── cache/         # LRU cache with O(k) tenant-index invalidation
+│   │       ├── config/        # Env validation (Zod)
+│   │       ├── db/            # Postgres pool + schema
+│   │       ├── engine/        # can() decision function + explainability
+│   │       ├── logger/        # Pino structured logging
+│   │       ├── middleware/    # Auth, admin-only, rate-limit, error handler
+│   │       └── routes/        # POST /can, /tuples, GET /health, /logs, /admin
+│   ├── core/            # @runeauth/core — embeddable engine (zero-dep on engine)
+│   └── sdk/             # @runeauth/sdk (zero external dependencies)
 │       └── src/
-│           ├── client.ts  # HTTP client
+│           ├── client.ts  # HTTP client with circuit-breaker + timeout
 │           ├── fluent.ts  # can().do().on() builder
 │           ├── types.ts   # Shared types
 │           └── index.ts   # Public API
@@ -289,14 +294,22 @@ rune/
 ## Running tests
 
 ```bash
+# Engine tests (requires Postgres)
 cd packages/engine
+pnpm test
+
+# SDK tests (no DB required)
+pnpm test:sdk
+
+# Core conditions tests (no DB required)
+cd packages/core
 pnpm test
 ```
 
-**Test coverage:** 87 tests across 8 suites
-- Unit: LRU cache (7), BFS traversal (8), can() function (7), DB constraints (14), Failure modes (8)
-- Integration: Routes (11), Security (10)
-- SDK: 18 tests (mock HTTP server)
+**Test coverage:**
+- Engine (unit + integration): LRU cache — 12 tests, BFS traversal — 8, can() — 7, DB constraints — 14, Failure modes — 8, Routes — 11, Security — 10
+- SDK: 19 tests (mock HTTP server, including health() timeout)
+- Core: 7 tests (ABAC conditions, UTC time_between)
 
 ---
 
@@ -311,3 +324,6 @@ pnpm test
 | `MAX_BFS_DEPTH` | ❌ | `20` | Max BFS traversal depth |
 | `MAX_BFS_NODES` | ❌ | `1000` | Max BFS nodes visited |
 | `API_KEY_SALT` | ❌ | — | Extra salt for key hashing |
+| `ADMIN_API_KEY` | ❌ | — | API key that can access `/admin` dashboard. Leave blank to disable the dashboard. |
+| `RATE_LIMIT_MAX` | ❌ | `100` | Max requests per API key per window |
+| `RATE_LIMIT_WINDOW_MS` | ❌ | `10000` | Rate limit window in milliseconds |

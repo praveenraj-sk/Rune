@@ -3,6 +3,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../middleware/auth.js'
+import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { query } from '../db/client.js'
 import { cache } from '../cache/lru.js'
 import { logger } from '../logger/index.js'
@@ -10,7 +11,7 @@ import { logger } from '../logger/index.js'
 export async function statsRoute(fastify: FastifyInstance): Promise<void> {
 
     fastify.get('/stats', {
-        preHandler: authMiddleware,
+        preHandler: [authMiddleware, rateLimitMiddleware],
     }, async (request, reply) => {
         const tenantId = request.tenantId
 

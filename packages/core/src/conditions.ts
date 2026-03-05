@@ -89,6 +89,14 @@ function evaluateCondition(name: string, when: Record<string, unknown>, ctx: Eva
 
 // ── Time condition ──────────────────────────────────────────
 
+/**
+ * Evaluates a time-of-day window condition.
+ *
+ * IMPORTANT: `time_between` values are interpreted as **UTC times**.
+ * This ensures consistent behaviour across all deployment regions and timezones.
+ * Example: `["09:00", "17:00"]` means 09:00–17:00 UTC, regardless of server timezone.
+ * If you need local-time behaviour, convert your window bounds to UTC before configuring.
+ */
 function evalTimeBetween(name: string, range: string[], ctx: EvalContext): ConditionResult {
     const now = ctx.time ?? new Date()
     const [startStr, endStr] = range as [string | undefined, string | undefined]
@@ -96,7 +104,7 @@ function evalTimeBetween(name: string, range: string[], ctx: EvalContext): Condi
         return { passed: false, name, reason: 'time_between requires [start, end] in HH:MM format' }
     }
 
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const currentMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
     const startMinutes = parseTimeToMinutes(startStr)
     const endMinutes = parseTimeToMinutes(endStr)
 
@@ -105,14 +113,14 @@ function evalTimeBetween(name: string, range: string[], ctx: EvalContext): Condi
     }
 
     const inRange = currentMinutes >= startMinutes && currentMinutes <= endMinutes
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const timeStr = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')} UTC`
 
     return {
         passed: inRange,
         name,
         reason: inRange
-            ? `${timeStr} is within ${startStr}–${endStr}`
-            : `${timeStr} is outside ${startStr}–${endStr}`,
+            ? `${timeStr} is within ${startStr}–${endStr} UTC`
+            : `${timeStr} is outside ${startStr}–${endStr} UTC`,
     }
 }
 

@@ -24,8 +24,9 @@ Client                    Engine
   │                         │
   ├─ POST /v1/can ─────────►│
   │                         ├─ 1. authMiddleware (SHA-256 key hash lookup)
-  │                         ├─ 2. JSON Schema validation (subject, action, object)
-  │                         ├─ 3. can() function
+  │                         ├─ 2. rateLimitMiddleware (sliding window per API key)
+  │                         ├─ 3. JSON Schema validation (subject, action, object)
+  │                         ├─ 4. can() function
   │                         │      ├─ Input validation (fail closed)
   │                         │      ├─ Build cache key
   │                         │      ├─ SCT staleness check
@@ -35,7 +36,7 @@ Client                    Engine
   │                         │      ├─ Get current LVN
   │                         │      ├─ Cache result
   │                         │      └─ Fire-and-forget: log decision to DB
-  │                         ├─ 4. Return Permission
+  │                         ├─ 5. Return Permission
   │◄────────────────────────┤
 ```
 
@@ -128,7 +129,9 @@ File: `packages/engine/src/cache/lru.ts`
 
 **Cache key:** `{tenant_id}:{subject}:{object}:{action}`
 
-**Cache invalidation:** The entire tenant's cache is wiped on every `POST /v1/tuples` or `DELETE /v1/tuples`. Brute-force O(n) but safe and simple at Phase 1 scale.
+**Tenant index:** A `Map<tenantId, Set<cacheKey>>` is maintained alongside the LRU. When a key is stored, it's registered in the tenant's Set. `deleteByTenant()` iterates only that tenant's Set — **O(k)** where k = cached entries for that tenant, not O(n) across the entire cache.
+
+**Cache invalidation:** On every `POST /v1/tuples` or `DELETE /v1/tuples` for a tenant, the entire tenant's cache is wiped using the index. The Set is removed after the wipe to prevent memory growth.
 
 **SCT (Staleness Check Token):** Each cached entry stores an `lvn`. Clients can pass their last-known `lvn` in the `sct` field to force cache bypass if the cache entry is older than their write.
 
@@ -158,6 +161,8 @@ The `tenant_id` is derived from the API key lookup — the client cannot set it.
 |---|---|
 | Fail-closed | `can()` wrapped in try/catch — any error → DENY |
 | No raw key storage | Keys hashed SHA-256 before DB insert |
+| Admin dashboard auth | `/admin` protected by `[authMiddleware, adminOnly]` — requires separate `ADMIN_API_KEY`. Dashboard disabled if env var is unset. |
+| Rate limiting | Sliding window per authenticated API key. `preHandler: [authMiddleware, rateLimitMiddleware]` on all `/v1/*` routes. Returns 429 when exceeded. |
 | No stack traces in responses | Error handler strips them |
 | Tenant isolation | Every query scoped by tenant_id from auth middleware |
 | BFS limits | Depth (20) + node (1000) limits prevent DoS |
@@ -206,3 +211,25 @@ Three outputs built for every decision:
 - **trace:** ordered list of nodes visited — `start → connected → connected → not_connected`
 - **reason:** one plain-English sentence explaining the decision
 - **suggested_fix:** 1-5 suggestions for how to grant access (DENY only), built from a reverse lookup of who already has access to the target object
+
+---
+
+## ABAC Conditions
+
+File: `packages/core/src/conditions.ts`
+
+ABAC conditions in `rune.config.yml` are evaluated after BFS+RBAC confirms a role grants the action.
+
+**`time_between`:** Time values are interpreted as **UTC**. This ensures consistent behaviour regardless of the server's local timezone or deployment region.
+
+```yaml
+conditions:
+  office_hours:
+    when:
+      time_between: ["09:00", "17:00"]   # UTC times
+    apply_to: ["edit", "delete"]
+```
+
+If you need office hours in a specific local timezone, convert your window bounds to UTC before configuring.
+
+Other supported condition types: `ip_in`, `resource.<attr>`, `subject.<attr>`, `equals`.

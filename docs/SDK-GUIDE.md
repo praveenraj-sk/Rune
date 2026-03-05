@@ -198,6 +198,8 @@ const health = await rune.health()
 // { status: 'degraded', db: 'error', timestamp: '...' }  ← Postgres is down
 ```
 
+Uses the same timeout and circuit-breaker as all other SDK calls — if the engine hangs and doesn't respond within `timeout` ms, a `RuneError` with `statusCode: 408` is thrown.
+
 Use this in your app startup or monitoring:
 
 ```ts
@@ -249,10 +251,11 @@ try {
 } catch (err) {
   if (err instanceof RuneError) {
     // HTTP-level errors from the engine
-    console.error(err.statusCode)   // 401, 500, 408...
+    console.error(err.statusCode)   // 401, 408, 429, 500...
     console.error(err.message)
     // 401 → invalid or missing API key
-    // 408 → request timed out (engine unreachable)
+    // 408 → request timed out (engine unreachable or too slow)
+    // 429 → rate limit exceeded — back off and retry after a short delay
     // 500 → engine internal error
   } else {
     // Network error (ECONNREFUSED — engine not running)

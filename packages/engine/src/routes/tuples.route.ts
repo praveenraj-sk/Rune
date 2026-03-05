@@ -10,6 +10,7 @@
  */
 import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../middleware/auth.js'
+import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { cache } from '../cache/lru.js'
 import { query } from '../db/client.js'
 import { logger } from '../logger/index.js'
@@ -36,7 +37,7 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
     fastify.get<{
         Querystring: { page?: string; limit?: string; search?: string }
     }>('/tuples', {
-        preHandler: authMiddleware,
+        preHandler: [authMiddleware, rateLimitMiddleware],
     }, async (request, reply) => {
         const tenantId = request.tenantId
         const page = Math.max(1, parseInt(request.query.page ?? '1', 10))
@@ -86,7 +87,7 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
 
     // POST /v1/tuples — add a relationship
     fastify.post<{ Body: TupleBody }>('/tuples', {
-        preHandler: authMiddleware,
+        preHandler: [authMiddleware, rateLimitMiddleware],
         schema: { body: bodySchema },
     }, async (request, reply) => {
         const { subject, relation, object } = request.body
@@ -120,7 +121,7 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
 
     // DELETE /v1/tuples — remove a relationship
     fastify.delete<{ Body: TupleBody }>('/tuples', {
-        preHandler: authMiddleware,
+        preHandler: [authMiddleware, rateLimitMiddleware],
         schema: { body: bodySchema },
     }, async (request, reply) => {
         const { subject, relation, object } = request.body

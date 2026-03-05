@@ -7,6 +7,7 @@
  * (zod is allowed in the engine package; zero-dep rule applies to SDK only)
  */
 import { z } from 'zod'
+import { createHash } from 'crypto'
 
 const configSchema = z.object({
     server: z.object({
@@ -28,11 +29,24 @@ const configSchema = z.object({
     security: z.object({
         apiKeySalt: z.string().min(32, 'API_KEY_SALT must be at least 32 characters'),
     }),
+    rateLimit: z.object({
+        maxRequests: z.number().default(100),
+        windowMs: z.number().default(10000),
+    }),
+    admin: z.object({
+        /** SHA-256 hash of ADMIN_API_KEY env var. Empty string = admin dashboard disabled. */
+        apiKeyHash: z.string().default(''),
+    }),
 })
 
 export type Config = z.infer<typeof configSchema>
 
 function loadConfig(): Config {
+    const adminKey = process.env['ADMIN_API_KEY'] ?? ''
+    const adminKeyHash = adminKey
+        ? createHash('sha256').update(adminKey).digest('hex')
+        : ''
+
     const result = configSchema.safeParse({
         server: {
             port: parseInt(process.env['PORT'] ?? '4078', 10),
@@ -54,6 +68,13 @@ function loadConfig(): Config {
             // In dev/test, allow a default salt so the server can start without .env
             apiKeySalt: process.env['API_KEY_SALT'] ?? 'dev_default_salt_not_for_production_use',
         },
+        rateLimit: {
+            maxRequests: parseInt(process.env['RATE_LIMIT_MAX'] ?? '100', 10),
+            windowMs: parseInt(process.env['RATE_LIMIT_WINDOW_MS'] ?? '10000', 10),
+        },
+        admin: {
+            apiKeyHash: adminKeyHash,
+        },
     })
 
     if (!result.success) {
@@ -66,3 +87,4 @@ function loadConfig(): Config {
 }
 
 export const config = loadConfig()
+

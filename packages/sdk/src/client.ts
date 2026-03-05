@@ -284,9 +284,7 @@ export class RuneClient {
 
     /** Check engine health status */
     async health(): Promise<HealthStatus> {
-        const url = `${this.config.baseUrl.replace(/\/$/, '')}/v1/health`
-        const res = await fetch(url)
-        return res.json() as Promise<HealthStatus>
+        return this.singleRequest<HealthStatus>('GET', '/v1/health')
     }
 }
 

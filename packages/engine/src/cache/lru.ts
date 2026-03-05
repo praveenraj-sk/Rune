@@ -6,7 +6,8 @@
  *
  * Design decisions:
  * - LRU eviction so hot paths stay warm automatically
- * - Tenant-scoped wipe on every write (brute force but safe at Phase 1 scale)
+ * - Tenant index (Map<tenantId, Set<key>>) makes deleteByTenant O(k) not O(n)
+ * - Empty Sets are removed from the index after a full tenant wipe or single-key delete
  * - LVN comparison for SCT-based staleness detection
  */
 import { LRUCache } from 'lru-cache'
@@ -20,6 +21,8 @@ export type CachedDecision = {
 
 class RuneCache {
     private readonly lru: LRUCache<string, CachedDecision>
+    /** tenantId → Set of cache keys belonging to that tenant */
+    private readonly tenantIndex = new Map<string, Set<string>>()
 
     constructor() {
         this.lru = new LRUCache<string, CachedDecision>({
@@ -37,31 +40,59 @@ class RuneCache {
         return `${tenantId}:${subject}:${object}:${action}`
     }
 
+    /** Extract the tenantId prefix from a cache key (first colon-delimited segment). */
+    private tenantFromKey(key: string): string {
+        return key.substring(0, key.indexOf(':'))
+    }
+
     get(key: string): CachedDecision | undefined {
         return this.lru.get(key)
     }
 
     set(key: string, value: CachedDecision): void {
         this.lru.set(key, value)
+        // Register key in the tenant index
+        const tenantId = this.tenantFromKey(key)
+        let keySet = this.tenantIndex.get(tenantId)
+        if (!keySet) {
+            keySet = new Set()
+            this.tenantIndex.set(tenantId, keySet)
+        }
+        keySet.add(key)
     }
 
     /**
-     * Wipe ALL cache entries belonging to a tenant.
+     * Delete a single key and remove it from the tenant index.
+     * Cleans up the tenant Set if it becomes empty.
+     */
+    delete(key: string): void {
+        this.lru.delete(key)
+        const tenantId = this.tenantFromKey(key)
+        const keySet = this.tenantIndex.get(tenantId)
+        if (keySet) {
+            keySet.delete(key)
+            if (keySet.size === 0) this.tenantIndex.delete(tenantId)
+        }
+    }
+
+    /**
+     * Wipe ALL cache entries belonging to a tenant — O(k) where k = entries for that tenant.
      *
+     * Uses the tenant index instead of scanning all LRU keys.
      * Called on every POST/DELETE /tuples for that tenant.
-     * This is brute-force O(n) but correct.
-     * At Phase 1 scale (<1M req/day), this runs rarely enough to be fine.
      * Phase 2 will replace this with subscription-based scoped invalidation.
      */
     deleteByTenant(tenantId: string): void {
-        const prefix = `${tenantId}:`
+        const keySet = this.tenantIndex.get(tenantId)
+        if (!keySet) return
+
         let deleted = 0
-        for (const key of this.lru.keys()) {
-            if (key.startsWith(prefix)) {
-                this.lru.delete(key)
-                deleted++
-            }
+        for (const key of keySet) {
+            this.lru.delete(key)
+            deleted++
         }
+        // Remove the now-empty Set from the index
+        this.tenantIndex.delete(tenantId)
         logger.debug({ tenantId, deleted }, 'cache_tenant_wiped')
     }
 
