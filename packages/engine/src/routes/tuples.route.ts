@@ -14,7 +14,7 @@ import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { cache } from '../cache/lru.js'
-import { query, getClient } from '../db/client.js'
+import { query, withLvnTransaction } from '../db/client.js'
 import { logger } from '../logger/index.js'
 import { indexGrant, removeGrant } from '../db/permission-index.js'
 import { getValidRelations, extractResourceType } from '../policy/config.js'
@@ -99,33 +99,16 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
         const tenantId = request.tenantId
 
         try {
-            const client = await getClient()
-            let lvn: number
-            try {
-                await client.query('BEGIN')
-
-                // Get next LVN and insert tuple atomically — prevents partial writes
-                const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-                const nextval = lvnResult.rows[0]?.nextval
-                if (!nextval) throw new Error('lvn_seq returned no rows — possible DB fault')
-                lvn = parseInt(nextval, 10)
-
+            const lvn = await withLvnTransaction(async (client, nextLvn) => {
                 // Upsert — idempotent
                 await client.query(
                     `INSERT INTO tuples (tenant_id, subject, relation, object, lvn)
                      VALUES ($1, $2, $3, $4, $5)
                      ON CONFLICT (tenant_id, subject, relation, object)
                      DO UPDATE SET lvn = EXCLUDED.lvn`,
-                    [tenantId, subject, relation, object, lvn]
+                    [tenantId, subject, relation, object, nextLvn]
                 )
-
-                await client.query('COMMIT')
-            } catch (err) {
-                await client.query('ROLLBACK').catch(() => { })
-                throw err
-            } finally {
-                client.release()
-            }
+            })
 
             // Priority 1 fix: update in-memory LVN so can() reads don't need a DB query
             updateLocalLvn(lvn)
@@ -171,11 +154,7 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
         const tenantId = request.tenantId
 
         try {
-            const client = await getClient()
-            let lvn: number
-            try {
-                await client.query('BEGIN')
-
+            const lvn = await withLvnTransaction(async (client) => {
                 await client.query(
                     `DELETE FROM tuples
                      WHERE tenant_id = $1
@@ -184,19 +163,7 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
                        AND object    = $4`,
                     [tenantId, subject, relation, object]
                 )
-
-                const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-                const nextval = lvnResult.rows[0]?.nextval
-                if (!nextval) throw new Error('lvn_seq returned no rows — possible DB fault')
-                lvn = parseInt(nextval, 10)
-
-                await client.query('COMMIT')
-            } catch (err) {
-                await client.query('ROLLBACK').catch(() => { })
-                throw err
-            } finally {
-                client.release()
-            }
+            })
 
             // Priority 1 fix: update in-memory LVN
             updateLocalLvn(lvn)
