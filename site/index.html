@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rune — Relationship-Based Authorization Engine</title>
+    <meta name="description"
+        content="Add fine-grained, graph-traversal permissions to your app in minutes. BFS-based authorization with sub-5ms latency, full explainability, and fail-closed security.">
+    <meta name="keywords" content="authorization, ReBAC, permissions, access control, graph traversal, Zanzibar">
+    <meta property="og:title" content="Rune — Ship permissions, not permission code">
+    <meta property="og:description"
+        content="Relationship-based authorization engine. Sub-5ms decisions with full explainability.">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- ═══ Nav ═══ -->
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <span class="logo-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg></span> Rune
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#quickstart">Quickstart</a>
+                <a href="https://github.com/praveenraj-sk/Rune" target="_blank" class="nav-github">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══ Hero ═══ -->
+    <section class="hero">
+        <div class="hero-glow"></div>
+        <div class="hero-grid"></div>
+        <div class="hero-content">
+            <div class="hero-badge">Open-source authorization engine</div>
+            <h1 class="hero-title">
+                Ship permissions,<br>
+                <span class="gradient-text">not permission code.</span>
+            </h1>
+            <p class="hero-subtitle">
+                Add relationship-based access control to your app in minutes.
+                Graph traversal decisions in under 5ms — with a full audit trail.
+            </p>
+            <div class="hero-terminal">
+                <div class="terminal-bar">
+                    <span class="terminal-dot red"></span>
+                    <span class="terminal-dot yellow"></span>
+                    <span class="terminal-dot green"></span>
+                    <span class="terminal-title">index.ts</span>
+                </div>
+                <pre class="terminal-code"><code><span class="kw">import</span> { Rune } <span class="kw">from</span> <span class="str">'@runeauth/sdk'</span>
+
+<span class="kw">const</span> rune = <span class="kw">new</span> <span class="fn">Rune</span>({
+  apiKey:  process.env.<span class="var">RUNE_API_KEY</span>,
+  baseUrl: <span class="str">'https://rune-engine.onrender.com'</span>,
+})
+
+<span class="cmt">// One line. That's it.</span>
+<span class="kw">const</span> result = <span class="kw">await</span> rune.<span class="fn">can</span>(<span class="str">'user:alice'</span>).<span class="fn">do</span>(<span class="str">'read'</span>).<span class="fn">on</span>(<span class="str">'doc:report'</span>)
+console.<span class="fn">log</span>(result.status) <span class="cmt">// "ALLOW"</span></code></pre>
+            </div>
+            <div class="hero-cta">
+                <a href="#quickstart" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/praveenraj-sk/Rune" target="_blank" class="btn btn-outline">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    View on GitHub
+                </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-value">&lt;5ms</span>
+                    <span class="stat-label">Median latency</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">170</span>
+                    <span class="stat-label">Tests passing</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">Dependencies (SDK)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Features ═══ -->
+    <section class="features" id="features">
+        <div class="section-inner">
+            <div class="section-header">
+                <span class="section-badge">Features</span>
+                <h2>Everything you need.<br>Nothing you don't.</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="5" cy="6" r="3" />
+                            <circle cx="19" cy="6" r="3" />
+                            <circle cx="12" cy="18" r="3" />
+                            <line x1="7.5" y1="7.5" x2="10.5" y2="16.5" />
+                            <line x1="16.5" y1="7.5" x2="13.5" y2="16.5" />
+                        </svg>
+                    </div>
+                    <h3>BFS Graph Traversal</h3>
+                    <p>Permissions flow through relationships. User → Group → Zone → Resource. Rune traces the path and
+                        gives you ALLOW or DENY.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
+                    </div>
+                    <h3>Sub-5ms Decisions</h3>
+                    <p>In-process LRU cache + materialised permission index means most checks never touch the database.
+                        Median latency under 5ms.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            <line x1="11" y1="8" x2="11" y2="14" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg>
+                    </div>
+                    <h3>Full Explainability</h3>
+                    <p>Every decision includes a trace, a human-readable reason, and a suggested fix. Debug access
+                        issues in seconds, not hours.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                    </div>
+                    <h3>Fail-Closed Security</h3>
+                    <p>Any error returns DENY, never ALLOW. API keys are SHA-256 hashed. BFS limits prevent graph bombs.
+                        Every query is tenant-isolated.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
+                    </div>
+                    <h3>Admin Dashboard</h3>
+                    <p>Built-in UI to view tuples, audit logs, cache stats, and run permission checks. Protected by a
+                        dedicated admin key.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                        </svg>
+                    </div>
+                    <h3>Zero-Dep SDK</h3>
+                    <p>The SDK uses native fetch only — zero external dependencies. Built-in circuit breaker, retry with
+                        backoff, and fluent API.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ How It Works ═══ -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="section-inner">
+            <div class="section-header">
+                <span class="section-badge">How It Works</span>
+                <h2>Permissions as a graph.</h2>
+                <p class="section-desc">Define relationships. Rune traces the graph to resolve access.</p>
+            </div>
+            <div class="graph-demo">
+                <div class="graph-container">
+                    <div class="graph-node node-user" id="node-user">
+                        <span class="node-emoji">👤</span>
+                        <span class="node-label">user:arjun</span>
+                    </div>
+                    <div class="graph-edge edge-1">
+                        <div class="edge-line"></div>
+                        <span class="edge-label">member</span>
+                    </div>
+                    <div class="graph-node node-group" id="node-group">
+                        <span class="node-emoji">👥</span>
+                        <span class="node-label">group:chennai_mgrs</span>
+                    </div>
+                    <div class="graph-edge edge-2">
+                        <div class="edge-line"></div>
+                        <span class="edge-label">owner</span>
+                    </div>
+                    <div class="graph-node node-zone" id="node-zone">
+                        <span class="node-emoji">📍</span>
+                        <span class="node-label">zone:chennai</span>
+                    </div>
+                    <div class="graph-edge edge-3">
+                        <div class="edge-line"></div>
+                        <span class="edge-label">viewer</span>
+                    </div>
+                    <div class="graph-node node-resource" id="node-resource">
+                        <span class="node-emoji">📦</span>
+                        <span class="node-label">shipment:TN001</span>
+                    </div>
+                    <div class="graph-result" id="graph-result">
+                        <span class="result-badge allow">✓ ALLOW</span>
+                    </div>
+                </div>
+                <div class="graph-explanation">
+                    <div class="explanation-card">
+                        <h4>The question</h4>
+                        <p class="mono">"Can user:arjun read shipment:TN001?"</p>
+                    </div>
+                    <div class="explanation-card">
+                        <h4>The answer</h4>
+                        <p>Rune traces: arjun is a <strong>member</strong> of chennai_managers, which
+                            <strong>owns</strong> zone:chennai, which has <strong>viewer</strong> access to
+                            shipment:TN001. Viewer grants read → <strong class="allow-text">ALLOW</strong>.
+                        </p>
+                    </div>
+                    <div class="explanation-card">
+                        <h4>The response</h4>
+                        <pre class="mini-code">{
+  "status": "ALLOW",
+  "trace": [
+    { "node": "user:arjun", "result": "start" },
+    { "node": "group:chennai_mgrs", "result": "connected" },
+    { "node": "zone:chennai", "result": "connected" },
+    { "node": "shipment:TN001", "result": "connected" }
+  ],
+  "latency_ms": 4.2
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Relations Table ═══ -->
+    <section class="relations">
+        <div class="section-inner">
+            <div class="section-header">
+                <span class="section-badge">Relation Semantics</span>
+                <h2>Four relations. Complete control.</h2>
+            </div>
+            <div class="table-wrapper">
+                <table class="relations-table">
+                    <thead>
+                        <tr>
+                            <th>Relation</th>
+                            <th>read</th>
+                            <th>edit</th>
+                            <th>delete</th>
+                            <th>manage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>owner</code></td>
+                            <td class="yes">✓</td>
+                            <td class="yes">✓</td>
+                            <td class="yes">✓</td>
+                            <td class="yes">✓</td>
+                        </tr>
+                        <tr>
+                            <td><code>editor</code></td>
+                            <td class="yes">✓</td>
+                            <td class="yes">✓</td>
+                            <td class="yes">✓</td>
+                            <td class="no">✗</td>
+                        </tr>
+                        <tr>
+                            <td><code>viewer</code></td>
+                            <td class="yes">✓</td>
+                            <td class="no">✗</td>
+                            <td class="no">✗</td>
+                            <td class="no">✗</td>
+                        </tr>
+                        <tr>
+                            <td><code>member</code></td>
+                            <td class="traverse">→</td>
+                            <td class="traverse">→</td>
+                            <td class="traverse">→</td>
+                            <td class="traverse">→</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="table-note"><code>member</code> is a traversal relation — it doesn't grant access itself, but
+                    lets the BFS continue to parent groups and zones.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Quickstart ═══ -->
+    <section class="quickstart" id="quickstart">
+        <div class="section-inner">
+            <div class="section-header">
+                <span class="section-badge">Quickstart</span>
+                <h2>Five minutes to production.</h2>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Install the SDK</h3>
+                        <pre class="step-code"><code>npm install @runeauth/sdk</code></pre>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Initialize the client</h3>
+                        <pre class="step-code"><code><span class="kw">import</span> { Rune } <span class="kw">from</span> <span class="str">'@runeauth/sdk'</span>
+
+<span class="kw">const</span> rune = <span class="kw">new</span> <span class="fn">Rune</span>({
+  apiKey:  process.env.<span class="var">RUNE_API_KEY</span>,
+  baseUrl: <span class="str">'https://rune-engine.onrender.com'</span>,
+})</code></pre>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Grant a permission</h3>
+                        <pre class="step-code"><code><span class="kw">await</span> rune.<span class="fn">allow</span>({
+  subject:  <span class="str">'user:alice'</span>,
+  relation: <span class="str">'viewer'</span>,
+  object:   <span class="str">'doc:report'</span>,
+})</code></pre>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h3>Check access</h3>
+                        <pre class="step-code"><code><span class="kw">const</span> result = <span class="kw">await</span> rune.<span class="fn">can</span>(<span class="str">'user:alice'</span>).<span class="fn">do</span>(<span class="str">'read'</span>).<span class="fn">on</span>(<span class="str">'doc:report'</span>)
+
+<span class="kw">if</span> (result.status === <span class="str">'ALLOW'</span>) {
+  <span class="cmt">// ✅ Access granted</span>
+}</code></pre>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h3>Protect a route (Express / Fastify)</h3>
+                        <pre class="step-code"><code><span class="cmt">// One-line route protection</span>
+app.<span class="fn">get</span>(<span class="str">'/docs/:id'</span>,
+  rune.<span class="fn">protect</span>(<span class="str">'read'</span>, <span class="str">'doc:{{params.id}}'</span>),
+  handler
+)</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ CTA ═══ -->
+    <section class="cta-section">
+        <div class="section-inner">
+            <div class="cta-glow"></div>
+            <h2>Ready to ship permissions?</h2>
+            <p>Open-source. Self-hostable. Free forever.</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/praveenraj-sk/Rune" target="_blank" class="btn btn-primary btn-large">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    Star on GitHub
+                </a>
+                <a href="https://www.npmjs.com/package/@runeauth/sdk" target="_blank" class="btn btn-outline btn-large">
+                    npm i @runeauth/sdk
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Footer ═══ -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="logo-icon">◆</span> Rune
+                <span class="footer-tagline">Relationship-based authorization engine.</span>
+            </div>
+            <div class="footer-links">
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="#quickstart">Quickstart</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Resources</h4>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/SDK-GUIDE.md" target="_blank">SDK
+                        Guide</a>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/ARCHITECTURE.md"
+                        target="_blank">Architecture</a>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/DEPLOY.md" target="_blank">Deploy
+                        Guide</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Community</h4>
+                    <a href="https://github.com/praveenraj-sk/Rune" target="_blank">GitHub</a>
+                    <a href="https://www.npmjs.com/package/@runeauth/sdk" target="_blank">npm</a>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/CONTRIBUTING.md"
+                        target="_blank">Contributing</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2026 Rune. MIT License.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
