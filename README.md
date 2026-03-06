@@ -1,104 +1,61 @@
+<div align="center">
+
 # Rune
 
-**Relationship-based authorization engine.** Add fine-grained, graph-traversal permissions to your app in minutes.
+**Relationship-based authorization engine.**<br>
+Add fine-grained, graph-traversal permissions to your app in minutes.
 
-> *"Does user:arjun have read access to shipment:TN001?"*
-> Rune traces the relationship graph — user → group → zone → resource — and gives you a clear ALLOW or DENY with a full explanation.
+[![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/@runeauth/sdk?color=black)](https://www.npmjs.com/package/@runeauth/sdk)
+[![Node.js](https://img.shields.io/badge/node-%E2%89%A518-black.svg)](https://nodejs.org)
+
+*"Can user:arjun read shipment:TN001?"*<br>
+Rune traces the graph — user → group → zone → resource — and returns ALLOW or DENY with a full explanation.
+
+</div>
 
 ---
 
-## Documentation
+## Why Rune?
 
-| Guide | Description |
+| | |
 |---|---|
-| [Development](docs/DEVELOPMENT.md) | Setup, env vars, project structure, common issues |
-| [Testing](docs/TESTING.md) | Running tests, writing tests, security attack suite |
-| [Contributing](CONTRIBUTING.md) | Branch naming, commit style, PR checklist, code rules |
-| [Publishing](docs/PUBLISHING.md) | How to release a new SDK version to npm |
-| [SDK Guide](docs/SDK-GUIDE.md) | Full SDK API reference + Express/Fastify integration |
-| [Architecture](docs/ARCHITECTURE.md) | BFS algorithm, data model, caching, security design |
-
----
-
-
-- **BFS graph traversal** — permissions flow through relationships (`user → group → zone → resource`)
-- **Instant decisions** — median latency < 5ms with in-process LRU cache (O(k) per-tenant invalidation)
-- **Full explainability** — every decision includes a trace, reason, and suggested fix
-- **Tenant-isolated** — every tenant's data is completely separated at the DB level
-- **Fail-closed** — any error returns DENY, never ALLOW
-- **Admin dashboard** — protected by a dedicated admin API key (`ADMIN_API_KEY`)
-- **Rate limiting** — sliding window per API key, configurable via env vars
+| 🔀 **Graph traversal** | Permissions flow through relationships — BFS finds the path |
+| ⚡ **< 5ms decisions** | LRU cache + permission index means most checks never hit the DB |
+| 🔍 **Full explainability** | Every decision includes a trace, reason, and suggested fix |
+| 🔒 **Fail-closed** | Errors return DENY, never ALLOW. Keys are SHA-256 hashed. |
+| 🏢 **Multi-tenant** | Every query is scoped to `tenant_id` — zero cross-tenant leakage |
+| 📦 **Zero-dep SDK** | Native `fetch` only — built-in circuit breaker & retry |
 
 ---
 
 ## Quickstart
 
-### 1. Prerequisites
-- Node.js 18+
-- [Docker Desktop](https://docs.docker.com/get-started/introduction/get-docker/) (or Podman)
-- pnpm
-
-### 2. Clone and install
-
 ```bash
-git clone https://github.com/praveenraj-sk/Rune.git
-cd Rune
+# 1. Clone & install
+git clone https://github.com/praveenraj-sk/Rune.git && cd Rune
 pnpm install
-```
 
-### 3. Start Postgres
-
-```bash
-# Docker Desktop
+# 2. Start Postgres
 docker compose up -d
 
-# Podman (built-in since Podman 4+)
-podman compose up -d
-```
-
-> **Troubleshooting:** If you see `role "rune" does not exist`, your Postgres volume has stale data. Fix:
-> ```bash
-> docker compose down -v   # wipe old volume
-> docker compose up -d     # fresh start with correct user
-> ```
-> *(replace `docker` with `podman` if using Podman)*
-
-### 4. Configure environment
-
-```bash
+# 3. Configure
 cp .env.example .env
-# Edit .env — set DATABASE_URL if needed
-```
 
-### 5. Run setup (creates schema + your first API key)
-
-```bash
+# 4. Create schema + first API key
 pnpm run setup
-```
 
-Output:
-```
-  ✓ Setup complete!
-
-  Tenant ID  11111111-...
-  API Key    rune_abc123...
-
-  Save your API key — it will not be shown again.
-```
-
-### 6. Start the engine
-
-```bash
+# 5. Start the engine
 pnpm dev
-# Engine running at http://localhost:4078
+# → http://localhost:4078
 ```
 
 ---
 
-## SDK Usage
+## SDK — 3 lines to check access
 
 ```bash
-npm install @runeauth/sdk   # v2.2.2 (latest)
+npm install @runeauth/sdk
 ```
 
 ```ts
@@ -106,158 +63,55 @@ import { Rune } from '@runeauth/sdk'
 
 const rune = new Rune({
   apiKey:  process.env.RUNE_API_KEY!,
-  baseUrl: 'https://rune-engine.onrender.com',  // or http://localhost:4078 for local
+  baseUrl: 'http://localhost:4078',
 })
 
-// Add a relationship
+// Grant access
 await rune.allow({ subject: 'user:alice', relation: 'viewer', object: 'doc:report' })
 
-// Check access — fluent style
+// Check access
 const result = await rune.can('user:alice').do('read').on('doc:report')
-console.log(result.status)  // "ALLOW"
-console.log(result.trace)   // [{ node: 'user:alice', result: 'start' }, ...]
+// → { status: 'ALLOW', trace: [...], latency_ms: 2.1 }
 
-// Check access — direct style  
-const r2 = await rune.check({ subject: 'user:alice', action: 'read', object: 'doc:report' })
-
-// Remove a relationship
+// Revoke access
 await rune.revoke({ subject: 'user:alice', relation: 'viewer', object: 'doc:report' })
-
-// Get recent decisions (for your dashboard)
-const { logs } = await rune.logs()
-
-// Health check
-const health = await rune.health()
 ```
 
 ---
 
-## ☁️ Cloud Deployment
-
-Rune is deployed and live at:
+## How it works
 
 ```
-https://rune-engine.onrender.com
+user:arjun  ──member──▸  group:chennai_mgrs  ──owner──▸  zone:chennai  ──viewer──▸  shipment:TN001
+                                                                                         ↓
+                                                                                    ✅ ALLOW
 ```
 
-See [Deployment Guide](docs/DEPLOY.md) for full setup instructions.
+Rune uses **Relationship-Based Access Control (ReBAC)**. You define *who has what relationship to what*, and Rune traces the graph via BFS to resolve access.
+
+| Relation | read | edit | delete | manage |
+|---|:---:|:---:|:---:|:---:|
+| `owner` | ✅ | ✅ | ✅ | ✅ |
+| `editor` | ✅ | ✅ | ✅ | ❌ |
+| `viewer` | ✅ | ❌ | ❌ | ❌ |
+| `member` | → | → | → | → |
+
+`member` is a traversal relation — it doesn't grant access, but lets BFS continue through groups and zones.
 
 ---
 
-## API Reference
+## Documentation
 
-### `POST /v1/can`
-
-Check whether a subject can perform an action on an object.
-
-**Headers:** `x-api-key: <your-key>`
-
-**Request:**
-```json
-{
-  "subject": "user:arjun",
-  "action":  "read",
-  "object":  "shipment:TN001"
-}
-```
-
-**Response:**
-```json
-{
-  "decision":      "allow",
-  "status":        "ALLOW",
-  "reason":        "Access granted — valid relationship found between user:arjun and shipment:TN001",
-  "trace": [
-    { "node": "user:arjun",             "result": "start" },
-    { "node": "group:chennai_managers", "result": "connected" },
-    { "node": "zone:chennai",           "result": "connected" },
-    { "node": "shipment:TN001",         "result": "connected" }
-  ],
-  "suggested_fix": [],
-  "cache_hit":     false,
-  "latency_ms":    4.2,
-  "sct":           { "lvn": 42 }
-}
-```
-
-**Actions:** `read` | `edit` | `delete` | `manage`
-
-**Status values:**
-| Status | Meaning |
+| Guide | What's inside |
 |---|---|
-| `ALLOW` | Access granted |
-| `DENY` | No valid relationship path found |
-| `NOT_FOUND` | The object doesn't exist in the tuple store |
-
----
-
-### `POST /v1/tuples`
-
-Add a relationship.
-
-```json
-{ "subject": "user:alice", "relation": "viewer", "object": "doc:report" }
-```
-
-**Relations:** `owner` | `editor` | `viewer` | `member`
-
----
-
-### `DELETE /v1/tuples`
-
-Remove a relationship. Same body as POST.
-
----
-
-### `GET /v1/logs`
-
-Returns last 100 authorization decisions for your tenant.
-
----
-
-### `GET /v1/health`
-
-No auth required. Returns `{ "status": "ok", "db": "connected" }`.
-
----
-
-## How relationships work
-
-Rune uses **Relationship-Based Access Control (ReBAC)**. You define *who has what relationship to what*, and Rune figures out access by traversal.
-
-```
-user:arjun  --[member]-->  group:chennai_managers
-                                    |
-                               [owner]
-                                    ↓
-                             zone:chennai
-                                    |
-                              [viewer]
-                                    ↓
-                          shipment:TN001  ✅ ALLOW
-```
-
-**Relation semantics:**
-
-| Relation | Grants `read` | Grants `edit` | Grants `delete` | Grants `manage` |
-|---|---|---|---|---|
-| `owner`   | ✅ | ✅ | ✅ | ✅ |
-| `editor`  | ✅ | ✅ | ✅ | ❌ |
-| `viewer`  | ✅ | ❌ | ❌ | ❌ |
-| `member`  | traversal only | traversal only | traversal only | traversal only |
-
-`member` is a traversal relation — it doesn't grant access itself, but lets the BFS continue to parent groups/zones.
-
----
-
-## Security
-
-- **API keys** are hashed with SHA-256 before storage — raw keys never hit the DB
-- **Admin dashboard** (`/admin`) requires a separate `ADMIN_API_KEY` — regular API keys cannot access it. Leave `ADMIN_API_KEY` unset to disable the dashboard entirely.
-- **Rate limiting** — all `/v1/*` routes enforce a sliding window per authenticated API key. Default: 100 requests per 10 seconds. Configure with `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS`.
-- **Tenant isolation** — every query is scoped to `tenant_id`, no cross-tenant leakage
-- **Fail-closed** — service errors return DENY, not ALLOW
-- **BFS limits** — max depth 20, max nodes 1000 — protects against graph bombs
+| [SDK Guide](docs/SDK-GUIDE.md) | Full API reference, Express/Fastify integration, error handling |
+| [API Reference](docs/API.md) | HTTP endpoints — `POST /v1/can`, `/v1/tuples`, etc. |
+| [Architecture](docs/ARCHITECTURE.md) | BFS algorithm, data model, caching, security design |
+| [Deploy Guide](docs/DEPLOY.md) | Deploy to Render with Postgres |
+| [Development](docs/DEVELOPMENT.md) | Local setup, env vars, project structure |
+| [Testing](docs/TESTING.md) | Running tests, writing tests, security attack suite |
+| [Contributing](CONTRIBUTING.md) | Branch naming, commit style, PR checklist |
+| [Security](SECURITY.md) | How to report vulnerabilities |
 
 ---
 
@@ -266,64 +120,58 @@ user:arjun  --[member]-->  group:chennai_managers
 ```
 rune/
 ├── packages/
-│   ├── engine/          # Fastify API server (TypeScript)
+│   ├── engine/          # Fastify v5 API server (TypeScript)
 │   │   └── src/
-│   │       ├── env-setup.ts   # Loads .env (ESM-safe, runs before config)
 │   │       ├── server.ts      # Entry point
 │   │       ├── bfs/           # BFS graph traversal
-│   │       ├── cache/         # LRU cache with O(k) tenant-index invalidation
+│   │       ├── cache/         # LRU cache with O(k) invalidation
 │   │       ├── config/        # Env validation (Zod)
-│   │       ├── db/            # Postgres pool + schema
+│   │       ├── db/            # Postgres pool + schema + migrations
 │   │       ├── engine/        # can() decision function + explainability
-│   │       ├── logger/        # Pino structured logging
-│   │       ├── middleware/    # Auth, admin-only, rate-limit, error handler
-│   │       └── routes/        # POST /can, /tuples, GET /health, /logs, /admin
-│   ├── core/            # @runeauth/core — embeddable engine (zero-dep on engine)
-│   └── sdk/             # @runeauth/sdk (zero external dependencies)
-│       └── src/
-│           ├── client.ts  # HTTP client with circuit-breaker + timeout
-│           ├── fluent.ts  # can().do().on() builder
-│           ├── types.ts   # Shared types
-│           └── index.ts   # Public API
-├── docker-compose.yml
-└── .env.example
+│   │       ├── middleware/    # Auth, admin-only, rate-limit
+│   │       ├── routes/        # /can, /tuples, /health, /logs, /admin
+│   │       └── dashboard/     # Built-in admin UI
+│   ├── core/            # @runeauth/core — embeddable engine (no server needed)
+│   └── sdk/             # @runeauth/sdk — zero-dep HTTP client
+├── docs/                # All documentation
+├── site/                # Landing page (GitHub Pages)
+├── docker-compose.yml   # Local Postgres
+└── .env.example         # Copy to .env to get started
 ```
 
 ---
 
-## Running tests
+## Tests
 
 ```bash
-# Engine tests (requires Postgres)
-cd packages/engine
-pnpm test
-
-# SDK tests (no DB required)
-pnpm test:sdk
-
-# Core conditions tests (no DB required)
-cd packages/core
-pnpm test
+pnpm test          # Engine (101 tests, requires Postgres)
+pnpm test:sdk      # SDK (30 tests)
+cd packages/core && pnpm test  # Core (39 tests)
 ```
 
-**Test coverage:**
-- Engine (unit + integration): LRU cache — 12 tests, BFS traversal — 8, can() — 7, DB constraints — 14, Failure modes — 8, Routes — 11, Security — 10
-- SDK: 19 tests (mock HTTP server, including health() timeout)
-- Core: 7 tests (ABAC conditions, UTC time_between)
+**170 tests** across 3 packages — unit, integration, security attack suite, chaos, and observability.
 
 ---
 
 ## Environment variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_URL` | ✅ | — | Postgres connection string |
-| `PORT` | ❌ | `4078` | Engine HTTP port |
-| `NODE_ENV` | ❌ | `development` | `development` or `production` |
-| `MAX_CACHE_SIZE` | ❌ | `10000` | Max LRU cache entries |
-| `MAX_BFS_DEPTH` | ❌ | `20` | Max BFS traversal depth |
-| `MAX_BFS_NODES` | ❌ | `1000` | Max BFS nodes visited |
-| `API_KEY_SALT` | ❌ | — | Extra salt for key hashing |
-| `ADMIN_API_KEY` | ❌ | — | API key that can access `/admin` dashboard. Leave blank to disable the dashboard. |
-| `RATE_LIMIT_MAX` | ❌ | `100` | Max requests per API key per window |
-| `RATE_LIMIT_WINDOW_MS` | ❌ | `10000` | Rate limit window in milliseconds |
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | — | Postgres connection string (required) |
+| `PORT` | `4078` | Engine HTTP port |
+| `NODE_ENV` | `development` | `development` or `production` |
+| `API_KEY_SALT` | — | Extra salt for API key hashing |
+| `ADMIN_API_KEY` | — | Enables `/admin` dashboard |
+| `MAX_CACHE_SIZE` | `10000` | Max LRU cache entries |
+| `MAX_BFS_DEPTH` | `20` | Max graph traversal depth |
+| `MAX_BFS_NODES` | `1000` | Max nodes visited per check |
+| `RATE_LIMIT_MAX` | `100` | Requests per key per window |
+| `RATE_LIMIT_WINDOW_MS` | `10000` | Rate limit window (ms) |
+
+See [.env.example](.env.example) for a ready-to-use template.
+
+---
+
+## License
+
+[MIT](LICENSE) © Praveen Raj
