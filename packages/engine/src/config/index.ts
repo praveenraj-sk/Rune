@@ -23,8 +23,8 @@ const configSchema = z.object({
         maxSize: z.number().default(10000),
     }),
     bfs: z.object({
-        maxDepth: z.number().default(20),
-        maxNodes: z.number().default(1000),
+        maxDepth: z.number().min(1, 'MAX_BFS_DEPTH must be at least 1 — setting 0 denies every permission check').default(20),
+        maxNodes: z.number().min(1, 'MAX_BFS_NODES must be at least 1 — setting 0 denies every permission check').default(1000),
     }),
     security: z.object({
         apiKeySalt: z.string().min(32, 'API_KEY_SALT must be at least 32 characters'),
@@ -42,6 +42,36 @@ const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>
 
 function loadConfig(): Config {
+    const nodeEnv = process.env['NODE_ENV'] ?? 'development'
+    const isProduction = nodeEnv === 'production'
+
+    // ── API_KEY_SALT enforcement ─────────────────────────────────────────────
+    // In production: MUST be set — server refuses to start without it.
+    // The default salt is public (it's in the GitHub repo), so using it in
+    // production means any DB dump is instantly reversible by an attacker.
+    //
+    // In dev/test: allowed to fall back to the default so the server starts
+    // without a .env file. A loud warning is printed so it's never missed.
+    const apiKeySalt = process.env['API_KEY_SALT']
+
+    if (!apiKeySalt) {
+        if (isProduction) {
+            console.error(
+                '\n🚨 FATAL: API_KEY_SALT environment variable is not set.\n' +
+                '   This server will NOT start in production without a secure salt.\n' +
+                '   Generate one with: openssl rand -hex 32\n' +
+                '   Then set it in your deployment environment (Render, Railway, etc.).\n'
+            )
+            process.exit(1)
+        } else {
+            console.warn(
+                '\n⚠️  WARNING: API_KEY_SALT is not set — using insecure default salt.\n' +
+                '   This is fine for local development, but MUST be set before deploying.\n' +
+                '   Generate one: openssl rand -hex 32\n'
+            )
+        }
+    }
+
     const adminKey = process.env['ADMIN_API_KEY'] ?? ''
     const adminKeyHash = adminKey
         ? createHash('sha256').update(adminKey).digest('hex')
@@ -50,7 +80,7 @@ function loadConfig(): Config {
     const result = configSchema.safeParse({
         server: {
             port: parseInt(process.env['PORT'] ?? '4078', 10),
-            nodeEnv: process.env['NODE_ENV'] ?? 'development',
+            nodeEnv,
         },
         db: {
             url: process.env['DATABASE_URL'],
@@ -65,8 +95,7 @@ function loadConfig(): Config {
             maxNodes: parseInt(process.env['MAX_BFS_NODES'] ?? '1000', 10),
         },
         security: {
-            // In dev/test, allow a default salt so the server can start without .env
-            apiKeySalt: process.env['API_KEY_SALT'] ?? 'dev_default_salt_not_for_production_use',
+            apiKeySalt: apiKeySalt ?? 'dev_default_salt_not_for_production_use',
         },
         rateLimit: {
             maxRequests: parseInt(process.env['RATE_LIMIT_MAX'] ?? '100', 10),
@@ -78,7 +107,6 @@ function loadConfig(): Config {
     })
 
     if (!result.success) {
-        // Use console.error here only — logger isn't initialized yet
         console.error('❌ Invalid Rune config — fix these before starting:\n', result.error.format())
         process.exit(1)
     }

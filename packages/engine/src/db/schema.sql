@@ -13,7 +13,14 @@ CREATE TABLE IF NOT EXISTS tuples (
   object      TEXT        NOT NULL,
   lvn         BIGINT      NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (tenant_id, subject, relation, object)
+  PRIMARY KEY (tenant_id, subject, relation, object),
+  -- Prevent empty strings from slipping in via direct DB access / migrations.
+  -- Application layer also validates these, but DB constraints are the last line.
+  -- NOTE: relation is intentionally unconstrained to a fixed enum — relations
+  -- are config-driven per tenant (rune.config.yml) and vary across deployments.
+  CONSTRAINT chk_tuples_subject_nonempty CHECK (subject  <> ''),
+  CONSTRAINT chk_tuples_relation_nonempty CHECK (relation <> ''),
+  CONSTRAINT chk_tuples_object_nonempty  CHECK (object   <> '')
 );
 
 -- Forward lookup: "what can this subject access?"
@@ -85,3 +92,27 @@ CREATE TABLE IF NOT EXISTS api_keys (
   last_used   TIMESTAMPTZ,
   PRIMARY KEY (id)
 );
+
+-- ─── 6. Permission Index ──────────────────────────────────────────────────────
+-- Materialised O(1) lookup table — pre-computes implied permissions from tuples.
+-- Most can() calls hit this before ever reaching the BFS graph traversal.
+-- Each row means: for this tenant, subject CAN perform action ON object.
+-- granted_by tracks which source tuple caused this entry (for clean deletion).
+--
+-- NOTE: The PRIMARY KEY on (tenant_id, subject, action, object) already creates
+-- a B-tree index covering the primary lookup. A separate idx_perm_lookup on the
+-- same four columns would be an exact duplicate and is intentionally omitted here.
+
+CREATE TABLE IF NOT EXISTS permission_index (
+  tenant_id   UUID    NOT NULL,
+  subject     TEXT    NOT NULL,
+  action      TEXT    NOT NULL,
+  object      TEXT    NOT NULL,
+  granted_by  TEXT    NOT NULL,  -- "{subject}|{relation}|{object}" of the source tuple
+  PRIMARY KEY (tenant_id, subject, action, object)
+);
+
+-- Cleanup index: find and remove all index entries derived from a specific tuple
+-- when that tuple is deleted. Different columns from the PRIMARY KEY — not redundant.
+CREATE INDEX IF NOT EXISTS idx_perm_granted_by
+  ON permission_index (tenant_id, granted_by);

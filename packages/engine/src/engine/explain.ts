@@ -15,6 +15,23 @@ import { logger } from '../logger/index.js'
 import type { TraceNode } from './types.js'
 
 /**
+ * Escapes HTML special characters in user-controlled values before
+ * interpolating them into suggestedFix / reason strings.
+ *
+ * Subject/object/relation names come from tuple data and are attacker-controlled.
+ * If a caller renders these strings as innerHTML without upstream escaping,
+ * this function prevents stored XSS.
+ */
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+}
+
+/**
  * Builds a trace array from the BFS path.
  * Each node is marked: 'start', 'connected', or 'not_connected'.
  */
@@ -32,6 +49,7 @@ export function buildTrace(path: string[], found: boolean): TraceNode[] {
 
 /**
  * Returns a single plain-English reason sentence.
+ * All user-controlled values are HTML-escaped.
  */
 export function buildReason(params: {
     found: boolean
@@ -42,11 +60,14 @@ export function buildReason(params: {
     action: string
 }): string {
     const { found, objectExists, limitHit, subject, object, action } = params
-    if (!objectExists) return `Resource ${object} does not exist`
+    const s = escapeHtml(subject)
+    const o = escapeHtml(object)
+    const a = escapeHtml(action)
+    if (!objectExists) return `Resource ${o} does not exist`
     if (limitHit === 'depth') return `Relationship graph exceeded depth limit — possible misconfiguration`
     if (limitHit === 'nodes') return `Relationship graph exceeded node limit — possible misconfiguration`
-    if (found) return `Access granted — valid relationship found between ${subject} and ${object}`
-    return `No valid relationship found between ${subject} and ${object} for action: ${action}`
+    if (found) return `Access granted — valid relationship found between ${s} and ${o}`
+    return `No valid relationship found between ${s} and ${o} for action: ${a}`
 }
 
 /**
@@ -54,6 +75,7 @@ export function buildReason(params: {
  * plain-English suggestions for how to grant access to `subject`.
  *
  * Returns a safe fallback on any error — must never throw.
+ * All user-controlled values are HTML-escaped before interpolation.
  */
 export async function buildSuggestedFix(
     tenantId: string,
@@ -61,6 +83,10 @@ export async function buildSuggestedFix(
     object: string,
     action: string,
 ): Promise<string[]> {
+    const s = escapeHtml(subject)
+    const o = escapeHtml(object)
+    const a = escapeHtml(action)
+
     try {
         const validRelations = getValidRelations(action)
 
@@ -75,25 +101,27 @@ export async function buildSuggestedFix(
         )
 
         if ((result.rowCount ?? 0) === 0) {
-            return [`Ask an admin to grant ${action} access to ${object}`]
+            return [`Ask an admin to grant ${a} access to ${o}`]
         }
 
         const fixes: string[] = []
         for (const row of result.rows) {
+            const rowSubject = escapeHtml(row.subject)
+            const rowRelation = escapeHtml(row.relation)
             if (row.subject.startsWith('group:')) {
-                fixes.push(`Add ${subject} to ${row.subject} to gain ${action} access`)
+                fixes.push(`Add ${s} to ${rowSubject} to gain ${a} access`)
             } else {
-                fixes.push(`Ask an admin to assign ${subject} as ${row.relation} on ${object} directly`)
+                fixes.push(`Ask an admin to assign ${s} as ${rowRelation} on ${o} directly`)
             }
         }
 
-        const directRelation = validRelations[0]
-        fixes.push(`Or assign ${subject} as ${directRelation} on ${object} directly`)
+        const directRelation = escapeHtml(validRelations[0] ?? 'owner')
+        fixes.push(`Or assign ${s} as ${directRelation} on ${o} directly`)
 
         return fixes
     } catch (error) {
         // buildSuggestedFix MUST NOT fail the main request — return safe fallback
         logger.error({ error: (error as Error).message }, 'build_suggested_fix_failed')
-        return [`Ask an admin to grant ${action} access to ${object}`]
+        return [`Ask an admin to grant ${a} access to ${o}`]
     }
 }

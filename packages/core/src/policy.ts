@@ -71,9 +71,12 @@ export function getValidRelationsFromPolicy(policy: ResolvedPolicy, action: stri
     if (resourceType && policy.resources[resourceType]) {
         const res = policy.resources[resourceType]
         if (res.actionToRoles[action]) return res.actionToRoles[action]
+        // Resource is defined but action is not — fail closed, return empty
+        // so BFS has no valid relations to traverse → DENY
+        return []
     }
 
-    // Check all resources
+    // Check all resources for this action
     const roles = new Set<string>()
     for (const res of Object.values(policy.resources)) {
         if (res.actionToRoles[action]) {
@@ -81,7 +84,8 @@ export function getValidRelationsFromPolicy(policy: ResolvedPolicy, action: stri
         }
     }
 
-    return roles.size > 0 ? [...roles] : [action, 'owner']
+    // Unknown action across all resources → empty array → BFS → DENY (fail-secure)
+    return [...roles]
 }
 
 function resolve(config: RuneConfig): ResolvedPolicy {

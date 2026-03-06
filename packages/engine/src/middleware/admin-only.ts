@@ -9,7 +9,7 @@
  *
  * If ADMIN_API_KEY is not set, the dashboard is disabled entirely (403 for everyone).
  */
-import { createHash } from 'crypto'
+import { createHash, timingSafeEqual } from 'crypto'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import { config } from '../config/index.js'
 import { logger } from '../logger/index.js'
@@ -33,7 +33,12 @@ export async function adminOnly(
 
     const keyHash = createHash('sha256').update(rawKey).digest('hex')
 
-    if (keyHash !== config.admin.apiKeyHash) {
+    // timingSafeEqual prevents byte-by-byte timing attacks on the hash comparison.
+    // Both buffers must be the same length — length check is itself constant-time here
+    // since both are always 64-char SHA-256 hex strings.
+    const a = Buffer.from(keyHash)
+    const b = Buffer.from(config.admin.apiKeyHash ?? '')
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
         logger.warn({ ip: request.ip }, 'admin_access_denied')
         await reply.status(403).send({ error: 'forbidden' })
         return

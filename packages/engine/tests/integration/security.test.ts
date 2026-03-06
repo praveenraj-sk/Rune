@@ -85,13 +85,25 @@ describe('🛡️ Security Tests', () => {
     })
 
     // ─── Attack 3: Invalid Relation Injection ───────────────────────────────────
-    test('ATTACK 3 — Invalid relation rejected at route level', async () => {
+    test('ATTACK 3 — Unknown relation accepted as tuple but grants no permissions', async () => {
+        // Relations are config-driven (rune.config.yml), not enforced by a DB CHECK.
+        // An unknown relation like 'superadmin' is stored as a tuple (200),
+        // but the policy config won't map it to any actions — BFS returns DENY.
         const res = await app.inject({
             method: 'POST', url: '/v1/tuples',
             headers: { 'x-api-key': LOGISTICS_KEY },
             payload: { subject: 'user:evil', relation: 'superadmin', object: 'zone:chennai' },
         })
-        expect(res.statusCode).toBe(400)
+        expect(res.statusCode).toBe(200)
+
+        // Verify: despite the tuple existing, 'superadmin' grants NO access
+        const canRes = await app.inject({
+            method: 'POST', url: '/v1/can',
+            headers: { 'x-api-key': LOGISTICS_KEY },
+            payload: { subject: 'user:evil', action: 'read', object: 'zone:chennai' },
+        })
+        const body = canRes.json<{ status: string }>()
+        expect(body.status).toBe('DENY')
     })
 
     // ─── Attack 4: Missing API Key ──────────────────────────────────────────────

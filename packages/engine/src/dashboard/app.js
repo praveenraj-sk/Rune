@@ -1,511 +1,308 @@
-/* ── Rune Dashboard — Enterprise JavaScript ── */
+/**
+ * Rune Admin Dashboard — app.js
+ *
+ * Auth flow:
+ *   1. On load → check sessionStorage for saved admin key
+ *   2. If found → verify against GET /v1/admin/verify (pure env-var hash check, no DB)
+ *   3. If valid → load tenant list, show dashboard
+ *   4. Sign out → clear sessionStorage, reload
+ *
+ * ALL data operations (logs, tuples, can) use /v1/admin/* endpoints which
+ * accept the same admin key. No tenant API key is ever needed in the browser.
+ */
 
-let API_KEY = '', BASE_URL = '', currentPage = 1, currentSearch = '', currentLogFilter = 'all', allLogs = [], searchTimeout = null;
+const SESSION_KEY = 'rune_admin_key'
 
-function getBaseUrl() { return window.location.origin }
+const app = {
+    adminKey: '',
+    tenantId: '',
+    tenants: [],
 
-/* ── Auth ── */
-async function authenticate() {
-    const key = document.getElementById('authKey').value.trim();
-    if (!key) { document.getElementById('authError').textContent = 'Please enter your API key'; return }
-    BASE_URL = getBaseUrl();
-    try {
-        const r = await fetch(BASE_URL + '/v1/health');
-        if (!r.ok) throw new Error('Engine unreachable');
-        const s = await fetch(BASE_URL + '/v1/stats', { headers: { 'x-api-key': key } });
-        if (s.status === 401) { document.getElementById('authError').textContent = 'Invalid API key'; return }
-        if (!s.ok) throw new Error('Connection failed');
-        API_KEY = key; localStorage.setItem('rune_key', key);
-        document.getElementById('authScreen').style.display = 'none';
-        document.getElementById('layout').style.display = 'flex';
-        loadAll();
-    } catch (e) { document.getElementById('authError').textContent = e.message }
-}
-
-function logout() {
-    API_KEY = ''; localStorage.removeItem('rune_key');
-    document.getElementById('layout').style.display = 'none';
-    document.getElementById('authScreen').style.display = 'flex';
-    document.getElementById('authKey').value = '';
-    document.getElementById('authError').textContent = '';
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-    const k = localStorage.getItem('rune_key');
-    if (k) { document.getElementById('authKey').value = k; authenticate() }
-});
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('authKey').addEventListener('keydown', e => { if (e.key === 'Enter') authenticate() });
-});
-
-/* ── API ── */
-async function api(m, p, b) {
-    const o = { method: m, headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' } };
-    if (b) o.body = JSON.stringify(b);
-    const r = await fetch(BASE_URL + p, o);
-    if (r.status === 401) { logout(); throw new Error('Unauthorized') }
-    return r.json();
-}
-
-async function loadAll() { await Promise.all([loadStats(), loadTuples(), loadLogs(), loadSettings()]) }
-
-/* ── Stats ── */
-async function loadStats() {
-    try {
-        const d = await api('GET', '/v1/stats');
-        document.getElementById('statTuples').textContent = d.total_tuples.toLocaleString();
-        document.getElementById('statDecisions').textContent = d.decisions_today.toLocaleString();
-        document.getElementById('statDecisionsSub').textContent = d.allow_today + ' allowed, ' + d.deny_today + ' denied';
-        document.getElementById('statLatency').textContent = d.avg_latency_ms.toFixed(1);
-        const rate = d.decisions_today > 0 ? Math.round(d.allow_today / d.decisions_today * 1000) / 10 : 0;
-        document.getElementById('statAllowRate').textContent = rate + '%';
-        document.getElementById('statCacheSub').textContent = 'Cache: ' + d.cache_stats.size + ' / ' + d.cache_stats.maxSize;
-    } catch (e) { }
-}
-
-/* ── Recent Logs ── */
-async function loadRecentLogs() {
-    try {
-        const d = await api('GET', '/v1/logs');
-        const t = document.getElementById('recentLogs');
-        if (!d.logs.length) { t.innerHTML = '<tr><td colspan="6" class="empty"><p>No decisions yet</p></td></tr>'; return }
-        t.innerHTML = d.logs.slice(0, 8).map(l =>
-            '<tr><td class="mono">' + esc(l.subject) +
-            '</td><td class="mono">' + esc(l.action) +
-            '</td><td class="mono">' + esc(l.object) +
-            '</td><td><span class="pill pill-' + (l.status === 'ALLOW' ? 'allow' : l.status === 'NOT_FOUND' ? 'notfound' : 'deny') + '">' + esc(l.status) +
-            '</span></td><td class="text-muted">' + parseFloat(l.latency_ms).toFixed(1) + 'ms' +
-            '</td><td class="text-muted">' + timeAgo(l.created_at) + '</td></tr>'
-        ).join('');
-    } catch (e) { }
-}
-
-/* ── Tuples ── */
-async function loadTuples(page, search) {
-    page = page || 1; search = search || ''; currentPage = page; currentSearch = search;
-    try {
-        const p = new URLSearchParams({ page: String(page), limit: '20' });
-        if (search) p.set('search', search);
-        const d = await api('GET', '/v1/tuples?' + p);
-        const t = document.getElementById('tuplesBody');
-        if (!d.tuples.length) {
-            t.innerHTML = '<tr><td colspan="5" class="empty"><p>No relationships found</p></td></tr>';
-        } else {
-            t.innerHTML = d.tuples.map(r =>
-                '<tr><td class="mono">' + esc(r.subject) +
-                '</td><td><span class="pill pill-relation">' + esc(r.relation) +
-                '</span></td><td class="mono">' + esc(r.object) +
-                '</td><td class="text-muted">' + timeAgo(r.created_at) +
-                '</td><td><button class="btn btn-remove btn-sm" onclick="removeTuple(\'' + esc(r.subject) + '\',\'' + esc(r.relation) + '\',\'' + esc(r.object) + '\')">Remove</button></td></tr>'
-            ).join('');
-        }
-        const pg = document.getElementById('pagination');
-        if (d.pages > 1) {
-            pg.innerHTML = '<button class="page-btn" onclick="loadTuples(' + (page - 1) + ',\'' + esc(search) + '\')" ' + (page <= 1 ? 'disabled' : '') + '>Prev</button>' +
-                '<span class="page-info">Page ' + page + ' of ' + d.pages + ' (' + d.total + ' total)</span>' +
-                '<button class="page-btn" onclick="loadTuples(' + (page + 1) + ',\'' + esc(search) + '\')" ' + (page >= d.pages ? 'disabled' : '') + '>Next</button>';
-        } else {
-            pg.innerHTML = d.total > 0 ? '<span class="page-info">' + d.total + ' relationship' + (d.total === 1 ? '' : 's') + '</span>' : '';
-        }
-    } catch (e) { }
-}
-
-function debouncedSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => loadTuples(1, document.getElementById('tupleSearch').value), 300) }
-function showAddModal() { document.getElementById('addModal').classList.add('show') }
-function hideAddModal() { document.getElementById('addModal').classList.remove('show');['addSubject', 'addRelation', 'addObject'].forEach(i => document.getElementById(i).value = '') }
-
-async function addTuple() {
-    const s = document.getElementById('addSubject').value.trim(),
-        r = document.getElementById('addRelation').value.trim(),
-        o = document.getElementById('addObject').value.trim();
-    if (!s || !r || !o) return;
-    try {
-        await api('POST', '/v1/tuples', { subject: s, relation: r, object: o });
-        hideAddModal();
-        loadTuples(currentPage, currentSearch);
-        loadStats();
-    } catch (e) { alert('Failed: ' + e.message) }
-}
-
-async function removeTuple(s, r, o) {
-    if (!confirm('Remove: ' + s + ' → ' + r + ' → ' + o + '?')) return;
-    try {
-        await api('DELETE', '/v1/tuples', { subject: s, relation: r, object: o });
-        loadTuples(currentPage, currentSearch);
-        loadStats();
-    } catch (e) { alert('Failed: ' + e.message) }
-}
-
-/* ── Logs ── */
-async function loadLogs() {
-    try { const d = await api('GET', '/v1/logs'); allLogs = d.logs; renderLogs(); loadRecentLogs() } catch (e) { }
-}
-
-function renderLogs() {
-    const f = currentLogFilter === 'all' ? allLogs : allLogs.filter(l => currentLogFilter === 'allow' ? l.status === 'ALLOW' : l.status !== 'ALLOW');
-    const t = document.getElementById('logsBody');
-    if (!f.length) { t.innerHTML = '<tr><td colspan="8" class="empty"><p>No matching logs</p></td></tr>'; return }
-    t.innerHTML = f.map(l =>
-        '<tr><td class="mono">' + esc(l.subject) +
-        '</td><td class="mono">' + esc(l.action) +
-        '</td><td class="mono">' + esc(l.object) +
-        '</td><td><span class="pill pill-' + (l.status === 'ALLOW' ? 'allow' : l.status === 'NOT_FOUND' ? 'notfound' : 'deny') + '">' + esc(l.status) +
-        '</span></td><td class="text-muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(l.reason || '—') +
-        '</td><td class="text-muted">' + parseFloat(l.latency_ms).toFixed(1) + 'ms' +
-        '</td><td class="text-muted">' + (l.cache_hit ? 'Cache' : 'Live') +
-        '</td><td class="text-muted">' + timeAgo(l.created_at) + '</td></tr>'
-    ).join('');
-}
-
-function filterLogs(type, el) {
-    currentLogFilter = type;
-    document.querySelectorAll('.filters .btn-ghost').forEach(b => b.classList.remove('active'));
-    el.classList.add('active');
-    renderLogs();
-}
-
-/* ── Permission Debugger ── */
-async function runDebugger() {
-    const subject = document.getElementById('dbgSubject').value.trim();
-    const action = document.getElementById('dbgAction').value.trim();
-    const object = document.getElementById('dbgObject').value.trim();
-    const tenant = document.getElementById('dbgTenant').value.trim() || 'default';
-
-    if (!subject || !action || !object) {
-        alert('Please fill in Subject, Action, and Object');
-        return;
-    }
-
-    const btn = document.getElementById('dbgRunBtn');
-    const resultDiv = document.getElementById('debuggerResult');
-    btn.disabled = true;
-    btn.textContent = 'Checking...';
-
-    try {
-        const result = await api('POST', '/v1/can', { subject, action, object, tenant });
-
-        const isAllow = result.status === 'ALLOW';
-        resultDiv.className = 'debugger-result ' + (isAllow ? 'result-allow' : 'result-deny');
-
-        let html = '<div class="result-header">';
-        html += '<span class="result-badge ' + (isAllow ? 'badge-allow' : 'badge-deny') + '">';
-        html += (isAllow ? '✓' : '✗') + ' ' + result.status;
-        html += '</span>';
-        html += '<span class="result-latency">' + parseFloat(result.latency_ms).toFixed(2) + 'ms</span>';
-        html += '</div>';
-
-        // ReBAC trace
-        html += '<div class="trace-section">';
-        html += '<div class="trace-title">ReBAC — Graph Traversal</div>';
-        if (result.trace && result.trace.length > 0) {
-            html += '<div class="trace-item"><span class="trace-check trace-pass">✓</span>';
-            html += '<span>Path: <code>' + esc(result.trace.join(' → ')) + '</code></span></div>';
-        } else if (result.status === 'NOT_FOUND') {
-            html += '<div class="trace-item"><span class="trace-check trace-fail">✗</span>';
-            html += '<span>Object not found in store</span></div>';
-        } else {
-            html += '<div class="trace-item"><span class="trace-check trace-fail">✗</span>';
-            html += '<span>No path found from subject to object</span></div>';
-        }
-        html += '</div>';
-
-        // RBAC
-        html += '<div class="trace-section">';
-        html += '<div class="trace-title">RBAC — Role Resolution</div>';
-        if (result.trace && result.trace.length > 0) {
-            html += '<div class="trace-item"><span class="trace-check trace-pass">✓</span>';
-            html += '<span>Role grants <code>' + esc(action) + '</code></span></div>';
-        } else {
-            html += '<div class="trace-item"><span class="trace-check trace-fail">✗</span>';
-            html += '<span>No role grants <code>' + esc(action) + '</code></span></div>';
-        }
-        html += '</div>';
-
-        // ABAC conditions
-        if (result.condition_results && result.condition_results.length > 0) {
-            html += '<div class="trace-section">';
-            html += '<div class="trace-title">ABAC — Conditions</div>';
-            for (const c of result.condition_results) {
-                html += '<div class="trace-item">';
-                html += '<span class="trace-check ' + (c.passed ? 'trace-pass' : 'trace-fail') + '">' + (c.passed ? '✓' : '✗') + '</span>';
-                html += '<span><code>' + esc(c.name) + '</code>: ' + esc(c.reason) + '</span>';
-                html += '</div>';
+    // ─── Boot ─────────────────────────────────────────────────────────
+    async init() {
+        const saved = sessionStorage.getItem(SESSION_KEY)
+        if (saved) {
+            const valid = await this.verifyKey(saved)
+            if (valid) {
+                this.adminKey = saved
+                await this.showApp()
+                return
             }
-            html += '</div>';
+            sessionStorage.removeItem(SESSION_KEY)
         }
+        this.showLogin()
+    },
 
-        // Reason
-        html += '<div class="trace-section">';
-        html += '<div class="trace-title">Reason</div>';
-        html += '<div class="trace-item" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--gray-600)">';
-        html += esc(result.reason || '—');
-        html += '</div></div>';
+    // ─── Key verification (no DB, pure env-var hash check) ──────────
+    async verifyKey(key) {
+        try {
+            const res = await fetch('/v1/admin/verify', { headers: { 'x-api-key': key } })
+            return res.ok
+        } catch {
+            return false
+        }
+    },
 
-        // Suggested fix
-        if (result.suggested_fix && result.suggested_fix.length > 0) {
-            html += '<div class="trace-section">';
-            html += '<div class="trace-title">Suggested Fix</div>';
-            for (const fix of result.suggested_fix) {
-                html += '<div class="trace-item" style="font-family:var(--font-mono);font-size:0.78rem">';
-                html += esc(fix);
-                html += '</div>';
+    // ─── Login screen ─────────────────────────────────────────────────
+    showLogin() {
+        document.getElementById('login-screen').classList.remove('hidden')
+        document.getElementById('app').classList.add('hidden')
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const btn = document.getElementById('login-btn')
+            const errEl = document.getElementById('login-error')
+            const key = document.getElementById('login-key-input').value.trim()
+
+            btn.disabled = true
+            btn.textContent = 'Signing in…'
+            errEl.classList.add('hidden')
+
+            const valid = await this.verifyKey(key)
+
+            if (valid) {
+                sessionStorage.setItem(SESSION_KEY, key)
+                this.adminKey = key
+                await this.showApp()
+            } else {
+                errEl.classList.remove('hidden')
+                btn.disabled = false
+                btn.textContent = 'Sign In'
             }
-            html += '</div>';
-        }
+        })
+    },
 
-        resultDiv.innerHTML = html;
-    } catch (e) {
-        resultDiv.className = 'debugger-result result-deny';
-        resultDiv.innerHTML = '<div class="result-header"><span class="result-badge badge-deny">✗ ERROR</span></div>' +
-            '<div class="trace-item"><span>' + esc(e.message) + '</span></div>';
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Check Permission';
-    }
-}
+    // ─── Main app ─────────────────────────────────────────────────────
+    async showApp() {
+        document.getElementById('login-screen').classList.add('hidden')
+        document.getElementById('app').classList.remove('hidden')
 
-/* ── Settings ── */
-async function loadSettings() {
-    document.getElementById('settingsUrl').textContent = BASE_URL;
-    document.getElementById('settingsKey').textContent = API_KEY.slice(0, 8) + '••••••••' + API_KEY.slice(-4);
-    try {
-        const h = await fetch(BASE_URL + '/v1/health').then(r => r.json());
-        document.getElementById('settingsStatus').textContent = h.status === 'ok' ? 'Connected' : 'Degraded';
-        document.getElementById('settingsDb').textContent = h.db === 'connected' ? 'Connected' : 'Error';
-        const s = await api('GET', '/v1/stats');
-        document.getElementById('settingsCacheMax').textContent = s.cache_stats.maxSize.toLocaleString();
-        document.getElementById('settingsCacheCurrent').textContent = s.cache_stats.size.toLocaleString();
-    } catch (e) { }
-}
+        // Load tenant list
+        await this.loadTenants()
 
-/* ── Navigation ── */
-function switchTab(name) {
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    event.target.closest('.nav-item').classList.add('active');
-    document.getElementById('panel-' + name).classList.add('active');
-    if (name === 'overview') { loadStats(); loadRecentLogs() }
-    if (name === 'relationships') loadTuples(currentPage, currentSearch);
-    if (name === 'logs') loadLogs();
-    if (name === 'settings') loadSettings();
-    if (name === 'graph') loadGraph();
-}
+        this.setupTabs()
+        this.setupForms()
+        this.setupSignOut()
+        this.refreshLogs()
+    },
 
-/* ── Helpers ── */
-function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML }
-function timeAgo(d) { const s = (Date.now() - new Date(d).getTime()) / 1000; if (s < 60) return Math.floor(s) + 's ago'; if (s < 3600) return Math.floor(s / 60) + 'm ago'; if (s < 86400) return Math.floor(s / 3600) + 'h ago'; return Math.floor(s / 86400) + 'd ago' }
-
-/* ── Auto Refresh ── */
-setInterval(() => { if (API_KEY && document.getElementById('panel-overview').classList.contains('active')) { loadStats(); loadRecentLogs() } }, 10000);
-
-/* ── Graph Visualizer ── */
-let graphData = null;
-let graphTranslate = { x: 0, y: 0 }, graphScale = 1, graphDragOrigin = null, graphDragTranslate = null;
-
-const NODE_COLORS = { user: '#6366f1', group: '#10b981', zone: '#f59e0b', resource: '#3b82f6' };
-function nodeColor(type) { return NODE_COLORS[type] || '#8b5cf6'; }
-
-async function loadGraph(search) {
-    const svg = document.getElementById('graphSvg');
-    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#94a3b8" dy="0.35em" font-size="14">Loading graph…</text>';
-    document.getElementById('graphEmpty').style.display = 'none';
-    document.getElementById('graphStats').textContent = '';
-    try {
-        const url = '/v1/graph' + (search ? '?search=' + encodeURIComponent(search) : '');
-        const data = await api('GET', url);
-        graphData = data;
-        if (!data.nodes || data.nodes.length === 0) {
-            svg.innerHTML = '';
-            document.getElementById('graphEmpty').style.display = 'flex';
-        } else {
-            renderForceGraph(data);
-            document.getElementById('graphStats').textContent =
-                data.total_nodes + ' nodes · ' + data.total_edges + ' edges' +
-                (search ? ' · filtered: ' + search : '');
-        }
-    } catch (e) {
-        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#ef4444" dy="0.35em" font-size="14">Failed to load graph: ' + esc(e.message) + '</text>';
-    }
-}
-
-function searchGraph() {
-    const s = document.getElementById('graphSearch').value.trim();
-    if (s) loadGraph(s);
-}
-function resetGraph() {
-    document.getElementById('graphSearch').value = '';
-    loadGraph();
-}
-
-function renderForceGraph(data) {
-    const container = document.getElementById('graphSvg').parentElement;
-    const W = container.clientWidth || 800, H = Math.max(480, container.clientHeight || 560);
-    const svg = document.getElementById('graphSvg');
-    svg.setAttribute('width', W); svg.setAttribute('height', H);
-    svg.innerHTML = '';
-
-    // ── Force layout (simple spring-electrical) ──────────────────────
-    const nodes = data.nodes.map((n, i) => ({
-        ...n,
-        x: W / 2 + (Math.random() - 0.5) * 300,
-        y: H / 2 + (Math.random() - 0.5) * 300,
-        vx: 0, vy: 0,
-    }));
-    const nodeById = {};
-    nodes.forEach(n => { nodeById[n.id] = n; });
-
-    const edges = data.edges.map(e => ({
-        ...e,
-        source: nodeById[e.source],
-        target: nodeById[e.target],
-    })).filter(e => e.source && e.target);
-
-    // Simulate spring forces
-    for (let iter = 0; iter < 120; iter++) {
-        // Repulsion
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
-                const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-                const force = 6000 / (dist * dist);
-                const fx = (dx / dist) * force, fy = (dy / dist) * force;
-                nodes[i].vx += fx; nodes[i].vy += fy;
-                nodes[j].vx -= fx; nodes[j].vy -= fy;
+    // ─── Tenant management ────────────────────────────────────────────
+    async loadTenants() {
+        try {
+            const data = await this.api('/v1/admin/tenants')
+            this.tenants = data.tenants || []
+            if (this.tenants.length > 0) {
+                this.tenantId = this.tenants[0].id
             }
+
+            // If multiple tenants, render a picker in the sidebar
+            if (this.tenants.length > 1) {
+                const nav = document.querySelector('.sidebar-nav')
+                const picker = document.createElement('div')
+                picker.style.cssText = 'padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);'
+                picker.innerHTML = `
+                    <label style="font-size:0.75rem;font-weight:500;color:var(--text-muted);display:block;margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em">Tenant</label>
+                    <select id="tenant-picker" style="width:100%;font-size:0.8125rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:#fff">
+                        ${this.tenants.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+                    </select>
+                `
+                nav.prepend(picker)
+                picker.querySelector('#tenant-picker').addEventListener('change', (e) => {
+                    this.tenantId = e.target.value
+                    this.refreshLogs()
+                })
+            }
+        } catch (err) {
+            console.warn('Could not load tenants:', err.message)
         }
-        // Attraction (spring)
-        edges.forEach(e => {
-            const dx = e.target.x - e.source.x, dy = e.target.y - e.source.y;
-            const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-            const force = (dist - 120) * 0.05;
-            const fx = (dx / dist) * force, fy = (dy / dist) * force;
-            e.source.vx += fx; e.source.vy += fy;
-            e.target.vx -= fx; e.target.vy -= fy;
-        });
-        // Center gravity
-        nodes.forEach(n => {
-            n.vx += (W / 2 - n.x) * 0.008;
-            n.vy += (H / 2 - n.y) * 0.008;
-        });
-        // Apply velocity + damping
-        nodes.forEach(n => {
-            n.x += n.vx * 0.6; n.y += n.vy * 0.6;
-            n.vx *= 0.5; n.vy *= 0.5;
-            n.x = Math.max(30, Math.min(W - 30, n.x));
-            n.y = Math.max(30, Math.min(H - 30, n.y));
-        });
+    },
+
+    setupSignOut() {
+        document.getElementById('signout-btn').addEventListener('click', () => {
+            sessionStorage.removeItem(SESSION_KEY)
+            location.reload()
+        })
+    },
+
+    setupTabs() {
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault()
+                const tabId = e.currentTarget.dataset.tab
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+                e.currentTarget.classList.add('active')
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'))
+                document.getElementById(`tab-${tabId}`).classList.remove('hidden')
+                if (tabId === 'overview') this.refreshLogs()
+            })
+        })
+    },
+
+    setupForms() {
+        document.getElementById('form-assign-access').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            await this.changeTuple('POST', {
+                subject: document.getElementById('assign-subject').value.trim(),
+                relation: document.getElementById('assign-relation').value,
+                object: document.getElementById('assign-object').value.trim(),
+            }, 'assign-status')
+        })
+
+        document.getElementById('form-delete-access').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            await this.changeTuple('DELETE', {
+                subject: document.getElementById('delete-subject').value.trim(),
+                relation: document.getElementById('delete-relation').value.trim(),
+                object: document.getElementById('delete-object').value.trim(),
+            }, 'delete-status')
+        })
+
+        document.getElementById('form-test-access').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            await this.runTest(
+                document.getElementById('test-subject').value.trim(),
+                document.getElementById('test-action').value,
+                document.getElementById('test-object').value.trim()
+            )
+        })
+    },
+
+    // ─── API helper — always uses admin key ──────────────────────────
+    async api(path, options = {}) {
+        const res = await fetch(path, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': this.adminKey,
+                ...options.headers,
+            }
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`)
+        return data
+    },
+
+    // ─── Activity Logs ────────────────────────────────────────────────
+    async refreshLogs() {
+        if (!this.tenantId) return
+        const tbody = document.getElementById('logs-tbody')
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Loading…</td></tr>'
+
+        try {
+            const data = await this.api(`/v1/admin/logs?tenantId=${this.tenantId}`)
+            const logs = data.logs || []
+
+            if (!logs.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">No recent activity for this tenant.</td></tr>'
+                return
+            }
+
+            tbody.innerHTML = ''
+            logs.forEach((log, i) => {
+                const allow = log.status === 'ALLOW'
+                const time = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+                const row = document.createElement('tr')
+                row.innerHTML = `
+                    <td><span class="badge ${allow ? 'badge-allow' : 'badge-deny'}">${log.status}</span></td>
+                    <td style="font-weight:500">${log.subject}</td>
+                    <td style="color:var(--text-muted)">${log.action}</td>
+                    <td style="font-weight:500">${log.object}</td>
+                    <td style="color:var(--text-muted);font-size:0.8125rem">${log.latency_ms != null ? parseFloat(log.latency_ms).toFixed(2) : '—'}ms</td>
+                    <td style="color:var(--text-muted);font-size:0.8125rem">${time}</td>
+                    <td><button class="expand-btn" onclick="app.toggleTrace(${i})">Trace ↓</button></td>
+                `
+                tbody.appendChild(row)
+
+                const trace = (log.trace || []).map((t, idx) => {
+                    const indent = '  '.repeat(idx)
+                    const icon = allow && idx === log.trace.length - 1 ? '✅' : '├─'
+                    return `${indent}${icon} ${t.node} (${t.result})`
+                }).join('\n') || 'No trace data.'
+
+                const traceRow = document.createElement('tr')
+                traceRow.id = `trace-${i}`
+                traceRow.className = 'trace-row hidden'
+                traceRow.innerHTML = `
+                    <td colspan="7" class="trace-cell">
+                        <div class="trace-label">Reason</div>
+                        <div class="trace-reason">${log.reason || '—'}</div>
+                        <div class="trace-label">BFS Trace</div>
+                        <div class="trace-tree">${trace}</div>
+                    </td>
+                `
+                tbody.appendChild(traceRow)
+            })
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-cell" style="color:var(--danger)">Error: ${err.message}</td></tr>`
+        }
+    },
+
+    toggleTrace(i) { document.getElementById(`trace-${i}`)?.classList.toggle('hidden') },
+
+    // ─── Directory ────────────────────────────────────────────────────
+    async changeTuple(method, { subject, relation, object }, statusId) {
+        const el = document.getElementById(statusId)
+        el.className = 'status-msg'
+        el.textContent = 'Processing…'
+        el.classList.remove('hidden')
+
+        try {
+            await this.api('/v1/admin/tuples', {
+                method,
+                body: JSON.stringify({ tenantId: this.tenantId, subject, relation, object })
+            })
+            el.classList.add('status-success')
+            el.textContent = `Relationship ${method === 'POST' ? 'added' : 'removed'} successfully.`
+        } catch (err) {
+            el.classList.add('status-error')
+            el.textContent = `Error: ${err.message}`
+        }
+    },
+
+    // ─── Playground ───────────────────────────────────────────────────
+    async runTest(subject, action, object) {
+        const container = document.getElementById('test-result-container')
+        const btn = document.getElementById('test-btn')
+        btn.disabled = true
+        btn.textContent = 'Running…'
+        container.innerHTML = '<div class="result-empty"><p>Running BFS traversal…</p></div>'
+
+        try {
+            const data = await this.api('/v1/admin/can', {
+                method: 'POST',
+                body: JSON.stringify({ tenantId: this.tenantId, subject, action, object })
+            })
+
+            const allow = data.status === 'ALLOW'
+            const trace = (data.trace || []).map((t, i) => {
+                const indent = '  '.repeat(i)
+                const icon = allow && i === data.trace.length - 1 ? '✅' : '├─'
+                return `${indent}${icon} ${t.node} (${t.result})`
+            }).join('\n') || 'No trace points.'
+
+            container.innerHTML = `
+                <div>
+                    <div class="result-status ${allow ? 'result-allow' : 'result-deny'}">${data.status}</div>
+                    <div style="font-size:0.8125rem;color:var(--text-muted)">${data.latency_ms?.toFixed(2)}ms · cache ${data.cache_hit ? 'HIT' : 'MISS'}</div>
+                    <hr class="result-divider">
+                    <div class="result-label">Reason</div>
+                    <div style="font-size:0.875rem;color:var(--text-muted);margin-bottom:1rem">${data.reason}</div>
+                    <div class="result-label">BFS Trace</div>
+                    <pre class="result-trace">${trace}</pre>
+                </div>
+            `
+        } catch (err) {
+            container.innerHTML = `
+                <div style="padding:1rem;background:var(--error-bg);border-radius:var(--radius);color:var(--error-text);font-size:0.875rem">
+                    <strong>Request failed</strong><br>${err.message}
+                </div>
+            `
+        } finally {
+            btn.disabled = false
+            btn.textContent = 'Run Test'
+        }
     }
-
-    // ── SVG elements ─────────────────────────────────────────────────
-    const ns = 'http://www.w3.org/2000/svg';
-
-    // Arrow marker
-    const defs = document.createElementNS(ns, 'defs');
-    const marker = document.createElementNS(ns, 'marker');
-    marker.setAttribute('id', 'arrow'); marker.setAttribute('viewBox', '0 0 10 10');
-    marker.setAttribute('refX', '20'); marker.setAttribute('refY', '5');
-    marker.setAttribute('markerWidth', '6'); marker.setAttribute('markerHeight', '6');
-    marker.setAttribute('orient', 'auto-start-reverse');
-    const path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z'); path.setAttribute('fill', '#94a3b8');
-    marker.appendChild(path); defs.appendChild(marker); svg.appendChild(defs);
-
-    // Pan/zoom group
-    const g = document.createElementNS(ns, 'g');
-    g.setAttribute('id', 'graphScene');
-    g.setAttribute('transform', 'translate(0,0) scale(1)');
-    svg.appendChild(g);
-
-    // Edges
-    edges.forEach(e => {
-        const line = document.createElementNS(ns, 'line');
-        line.setAttribute('x1', e.source.x); line.setAttribute('y1', e.source.y);
-        line.setAttribute('x2', e.target.x); line.setAttribute('y2', e.target.y);
-        line.setAttribute('stroke', '#cbd5e1'); line.setAttribute('stroke-width', '1.5');
-        line.setAttribute('marker-end', 'url(#arrow)');
-        g.appendChild(line);
-
-        // Edge label
-        const mx = (e.source.x + e.target.x) / 2, my = (e.source.y + e.target.y) / 2;
-        const label = document.createElementNS(ns, 'text');
-        label.setAttribute('x', mx); label.setAttribute('y', my - 4);
-        label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('font-size', '10'); label.setAttribute('fill', '#94a3b8');
-        label.setAttribute('font-family', 'Inter,sans-serif');
-        label.textContent = e.relation;
-        g.appendChild(label);
-    });
-
-    // Nodes
-    nodes.forEach(n => {
-        const nodeG = document.createElementNS(ns, 'g');
-        nodeG.style.cursor = 'pointer';
-
-        const circle = document.createElementNS(ns, 'circle');
-        circle.setAttribute('cx', n.x); circle.setAttribute('cy', n.y); circle.setAttribute('r', '14');
-        circle.setAttribute('fill', nodeColor(n.type));
-        circle.setAttribute('stroke', '#fff'); circle.setAttribute('stroke-width', '2');
-        nodeG.appendChild(circle);
-
-        const label = document.createElementNS(ns, 'text');
-        label.setAttribute('x', n.x); label.setAttribute('y', n.y + 26);
-        label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('font-size', '11'); label.setAttribute('fill', '#475569');
-        label.setAttribute('font-family', 'Inter,sans-serif');
-        // Truncate long IDs
-        const display = n.id.length > 18 ? n.id.slice(0, 16) + '…' : n.id;
-        label.textContent = display;
-        nodeG.appendChild(label);
-
-        // Hover effect
-        circle.addEventListener('mouseenter', () => circle.setAttribute('r', '18'));
-        circle.addEventListener('mouseleave', () => circle.setAttribute('r', '14'));
-
-        // Click → show node detail
-        nodeG.addEventListener('click', () => showNodeDetail(n, edges));
-
-        g.appendChild(nodeG);
-    });
-
-    // ── Pan + zoom ────────────────────────────────────────────────────
-    graphTranslate = { x: 0, y: 0 }; graphScale = 1;
-
-    svg.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        graphScale = Math.max(0.3, Math.min(3, graphScale * (e.deltaY < 0 ? 1.1 : 0.9)));
-        updateGraphTransform();
-    }, { passive: false });
-
-    svg.addEventListener('mousedown', (e) => {
-        graphDragOrigin = { x: e.clientX, y: e.clientY };
-        graphDragTranslate = { ...graphTranslate };
-    });
-    svg.addEventListener('mousemove', (e) => {
-        if (!graphDragOrigin) return;
-        graphTranslate.x = graphDragTranslate.x + (e.clientX - graphDragOrigin.x);
-        graphTranslate.y = graphDragTranslate.y + (e.clientY - graphDragOrigin.y);
-        updateGraphTransform();
-    });
-    svg.addEventListener('mouseup', () => { graphDragOrigin = null; });
-    svg.addEventListener('mouseleave', () => { graphDragOrigin = null; });
 }
 
-function updateGraphTransform() {
-    const scene = document.getElementById('graphScene');
-    if (scene) scene.setAttribute('transform', `translate(${graphTranslate.x},${graphTranslate.y}) scale(${graphScale})`);
-}
-
-function showNodeDetail(node, edges) {
-    const panel = document.getElementById('graphNodePanel');
-    document.getElementById('graphNodeTitle').textContent = node.id;
-    document.getElementById('graphNodeType').textContent = 'Type: ' + node.type;
-    const outgoing = edges.filter(e => e.source.id === node.id);
-    const incoming = edges.filter(e => e.target.id === node.id);
-    let html = '';
-    if (outgoing.length) html += '<div style="font-weight:600;font-size:12px;margin-bottom:4px">Outgoing</div>' + outgoing.map(e => `<div style="font-size:12px;color:#64748b">→ <b>${esc(e.relation)}</b> → ${esc(e.target.id)}</div>`).join('');
-    if (incoming.length) html += '<div style="font-weight:600;font-size:12px;margin:6px 0 4px">Incoming</div>' + incoming.map(e => `<div style="font-size:12px;color:#64748b">${esc(e.source.id)} → <b>${esc(e.relation)}</b> →</div>`).join('');
-    if (!outgoing.length && !incoming.length) html = '<div style="font-size:12px;color:#94a3b8">No connections</div>';
-    document.getElementById('graphNodeRelations').innerHTML = html;
-    panel.style.display = 'block';
-}
-
+document.addEventListener('DOMContentLoaded', () => app.init())

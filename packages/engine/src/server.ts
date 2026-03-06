@@ -10,7 +10,13 @@
 import './env-setup.js'
 
 import Fastify from 'fastify'
+import fastifyStatic from '@fastify/static'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { config } from './config/index.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 import { logger } from './logger/index.js'
 import { canRoute } from './routes/can.route.js'
 import { tuplesRoute } from './routes/tuples.route.js'
@@ -23,6 +29,7 @@ import { indexHealthRoute } from './routes/index-health.route.js'
 import { indexRebuildRoute } from './routes/index-rebuild.route.js'
 import { errorHandler } from './middleware/error-handler.js'
 import { loadPolicy } from './policy/config.js'
+import { refreshLvnFromDb } from './engine/lvn.js'
 
 const fastify = Fastify({
     logger: false,  // we use our own pino logger
@@ -41,12 +48,27 @@ fastify.register(graphRoute, { prefix: '/v1' })
 fastify.register(indexHealthRoute, { prefix: '/v1' })
 fastify.register(indexRebuildRoute, { prefix: '/v1' })
 
+// Serve static dashboard
+fastify.register(fastifyStatic, {
+    root: path.join(__dirname, 'dashboard'),
+    prefix: '/dashboard/',
+})
+
+// Redirect /dashboard to /dashboard/index.html
+fastify.get('/dashboard', (req, reply) => {
+    reply.redirect('/dashboard/')
+})
+
 
 // Start server
 const start = async () => {
     try {
         // Load authorization policy from rune.config.yml (or defaults)
         loadPolicy()
+
+        // Priority 1 fix: sync LVN from DB once on startup so the in-memory
+        // value is correct after a server restart (Render deploys, etc.)
+        await refreshLvnFromDb()
 
         const address = await fastify.listen({ port: config.server.port, host: '0.0.0.0' })
         logger.info({ address, env: config.server.nodeEnv }, 'rune_engine_started')

@@ -6,6 +6,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest'
 import { can } from '../../src/engine/can.js'
 import { cache } from '../../src/cache/lru.js'
 import { query } from '../../src/db/client.js'
+import { refreshLvnFromDb } from '../../src/engine/lvn.js'
 import { LOGISTICS_TENANT, EMPTY_TENANT, logisticsTuples, hospitalTuples, HOSPITAL_TENANT } from '../fixtures/tuples.js'
 
 async function insertTuples(tenantId: string, tuples: Array<{ subject: string; relation: string; object: string }>) {
@@ -26,6 +27,8 @@ beforeEach(async () => {
     cache.deleteByTenant(HOSPITAL_TENANT)
     await insertTuples(LOGISTICS_TENANT, logisticsTuples)
     await insertTuples(HOSPITAL_TENANT, hospitalTuples)
+    // Sync in-memory LVN from DB so sct.lvn reflects real sequence value
+    await refreshLvnFromDb()
 })
 
 afterEach(async () => {

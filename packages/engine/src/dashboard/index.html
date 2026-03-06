@@ -2,374 +2,265 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rune — Authorization Dashboard</title>
-  <meta name="description"
-    content="Rune Authorization Engine — Manage relationships, debug permissions, inspect audit logs.">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/v1/admin/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rune — Admin Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
 </head>
 
 <body>
 
-  <!-- Auth Screen -->
-  <div class="auth-screen" id="authScreen">
-    <div class="auth-card">
-      <div class="auth-logo">
-        <svg viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="#4f46e5" />
-          <path d="M10 15l-3-3 1.41-1.41L10 12.17l5.59-5.59L17 8l-7 7z" fill="#fff" />
-        </svg>
-        <span>Rune</span>
-      </div>
-      <p class="auth-subtitle">Authorization Dashboard</p>
-      <div class="field"><label>API Key</label><input type="password" id="authKey" placeholder="rune_xxxxxxxxxxxxxxxx"
-          autocomplete="off"></div>
-      <button class="btn-primary" onclick="authenticate()">Sign In</button>
-      <div class="auth-error" id="authError"></div>
-    </div>
-  </div>
-
-  <!-- Layout -->
-  <div class="layout" id="layout">
-    <aside class="sidebar">
-      <div class="sidebar-logo">
-        <svg viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="#6366f1" />
-          <path d="M10 15l-3-3 1.41-1.41L10 12.17l5.59-5.59L17 8l-7 7z" fill="#fff" />
-        </svg>
-        <span>Rune</span>
-      </div>
-      <div class="sidebar-version">Authorization Engine</div>
-      <nav class="sidebar-nav">
-        <div class="sidebar-section">Monitor</div>
-        <a class="nav-item active" onclick="switchTab('overview')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-          </svg>
-          <span>Overview</span>
-        </a>
-        <a class="nav-item" onclick="switchTab('logs')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
-          <span>Audit Logs</span>
-        </a>
-
-        <div class="sidebar-section">Manage</div>
-        <a class="nav-item" onclick="switchTab('relationships')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-          </svg>
-          <span>Relationships</span>
-        </a>
-        <a class="nav-item" onclick="switchTab('debugger')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          <span>Debugger</span>
-        </a>
-        <a class="nav-item" onclick="switchTab('graph')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="5" cy="12" r="2" />
-            <circle cx="19" cy="5" r="2" />
-            <circle cx="19" cy="19" r="2" />
-            <circle cx="12" cy="12" r="2" />
-            <line x1="7" y1="12" x2="10" y2="12" />
-            <line x1="14" y1="12" x2="17" y2="6" />
-            <line x1="14" y1="12" x2="17" y2="18" />
-          </svg>
-          <span>Graph</span>
-        </a>
-
-        <div class="sidebar-section">System</div>
-        <a class="nav-item" onclick="switchTab('settings')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-          </svg>
-          <span>Settings</span>
-        </a>
-      </nav>
-      <div class="sidebar-footer">
-        <button class="btn-disconnect" onclick="logout()">Disconnect</button>
-      </div>
-    </aside>
-
-    <div class="main">
-      <!-- Overview -->
-      <div class="panel active" id="panel-overview">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Overview</h1>
-            <p class="page-subtitle">Real-time authorization metrics</p>
-          </div>
-          <div class="page-status">
-            <div class="status-indicator" id="statusDot"></div><span id="statusText">Connected</span>
-          </div>
-        </div>
-        <div class="page-content">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Total Relationships</div>
-              <div class="stat-value" id="statTuples">&mdash;</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Decisions Today</div>
-              <div class="stat-value" id="statDecisions">&mdash;</div>
-              <div class="stat-detail" id="statDecisionsSub"></div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Avg Latency</div>
-              <div class="stat-value" id="statLatency">&mdash;</div>
-              <div class="stat-detail">ms per check</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">Allow Rate</div>
-              <div class="stat-value" id="statAllowRate">&mdash;</div>
-              <div class="stat-detail" id="statCacheSub"></div>
-            </div>
-          </div>
-          <div class="section-header">
-            <h2 class="section-title">Recent Decisions</h2>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Action</th>
-                  <th>Resource</th>
-                  <th>Result</th>
-                  <th>Latency</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-              <tbody id="recentLogs"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Relationships -->
-      <div class="panel" id="panel-relationships">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Relationships</h1>
-            <p class="page-subtitle">Authorization graph — subjects, relations, objects</p>
-          </div>
-        </div>
-        <div class="page-content">
-          <div class="toolbar">
-            <input class="search-input" type="text" id="tupleSearch"
-              placeholder="Search subjects, relations, objects..." oninput="debouncedSearch()">
-            <button class="btn btn-add" onclick="showAddModal()"><svg width="14" height="14" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg> Add</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Relation</th>
-                  <th>Object</th>
-                  <th>Created</th>
-                  <th style="width:80px"></th>
-                </tr>
-              </thead>
-              <tbody id="tuplesBody"></tbody>
-            </table>
-          </div>
-          <div class="pagination" id="pagination"></div>
-        </div>
-      </div>
-
-      <!-- Audit Logs -->
-      <div class="panel" id="panel-logs">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Audit Logs</h1>
-            <p class="page-subtitle">Every authorization decision, recorded</p>
-          </div>
-        </div>
-        <div class="page-content">
-          <div class="filters">
-            <button class="btn btn-ghost active" onclick="filterLogs('all',this)">All</button>
-            <button class="btn btn-ghost" onclick="filterLogs('allow',this)">Allowed</button>
-            <button class="btn btn-ghost" onclick="filterLogs('deny',this)">Denied</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Action</th>
-                  <th>Resource</th>
-                  <th>Result</th>
-                  <th>Reason</th>
-                  <th>Latency</th>
-                  <th>Source</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-              <tbody id="logsBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Permission Debugger -->
-      <div class="panel" id="panel-debugger">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Permission Debugger</h1>
-            <p class="page-subtitle">Test authorization decisions — ReBAC + RBAC + ABAC in one check</p>
-          </div>
-        </div>
-        <div class="page-content">
-          <div class="debugger-layout">
-            <div class="debugger-form">
-              <h3>Check Permission</h3>
-              <div class="field">
-                <label>Subject</label>
-                <input type="text" id="dbgSubject" placeholder="user:arjun">
-                <div class="hint">Who is making the request</div>
-              </div>
-              <div class="field">
-                <label>Action</label>
-                <input type="text" id="dbgAction" placeholder="read">
-                <div class="hint">What they want to do</div>
-              </div>
-              <div class="field">
-                <label>Object</label>
-                <input type="text" id="dbgObject" placeholder="document:readme">
-                <div class="hint">What resource they want to access</div>
-              </div>
-              <div class="field">
-                <label>Tenant <span style="color:var(--gray-400);font-weight:400">(optional)</span></label>
-                <input type="text" id="dbgTenant" placeholder="default">
-                <div class="hint">e.g. org:acme, workspace:123</div>
-              </div>
-              <button class="btn-check" id="dbgRunBtn" onclick="runDebugger()">Check Permission</button>
-            </div>
-            <div class="debugger-result" id="debuggerResult">
-              <div class="debugger-placeholder">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <!-- ─────────────────── LOGIN SCREEN ─────────────────── -->
+    <div id="login-screen" class="login-screen hidden">
+        <div class="login-card">
+            <div class="login-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
                 </svg>
-                <p><strong>Permission Debugger</strong></p>
-                <p style="font-size:0.78rem">Fill in the form and click "Check Permission"<br>to see the full
-                  ReBAC → RBAC → ABAC evaluation trace.</p>
-              </div>
+                <span>Rune</span>
             </div>
-          </div>
-        </div>
-      </div>
+            <h1 class="login-title">Admin Sign In</h1>
+            <p class="login-subtitle">Enter the <code>ADMIN_API_KEY</code> set on your Rune engine to continue.</p>
 
-      <!-- Settings -->
-      <div class="panel" id="panel-settings">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Settings</h1>
-            <p class="page-subtitle">Engine configuration and connection status</p>
-          </div>
-        </div>
-        <div class="page-content">
-          <div class="settings-section">
-            <div class="settings-heading">Connection</div>
-            <div class="settings-row"><span class="settings-label">Engine URL</span><span class="settings-value"
-                id="settingsUrl"></span></div>
-            <div class="settings-row"><span class="settings-label">API Key</span><span class="settings-value"
-                id="settingsKey"></span></div>
-            <div class="settings-row"><span class="settings-label">Status</span><span class="settings-value"
-                id="settingsStatus"></span></div>
-          </div>
-          <div class="settings-section">
-            <div class="settings-heading">Engine</div>
-            <div class="settings-row"><span class="settings-label">Database</span><span class="settings-value"
-                id="settingsDb"></span></div>
-            <div class="settings-row"><span class="settings-label">Cache Size</span><span class="settings-value"
-                id="settingsCacheCurrent"></span></div>
-            <div class="settings-row"><span class="settings-label">Cache Capacity</span><span class="settings-value"
-                id="settingsCacheMax"></span></div>
-          </div>
-        </div>
-      </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-key-input">Admin API Key</label>
+                    <input type="password" id="login-key-input" class="input w-full" placeholder="rune_admin_••••••••"
+                        autocomplete="current-password" required />
+                </div>
+                <div id="login-error" class="login-error hidden">
+                    Incorrect admin key. Please check your <code>ADMIN_API_KEY</code> environment variable.
+                </div>
+                <button type="submit" id="login-btn" class="btn btn-primary w-full mt-4">
+                    Sign In
+                </button>
+            </form>
 
-      <!-- Graph Visualizer -->
-      <div class="panel" id="panel-graph">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Relationship Graph</h1>
-            <p class="page-subtitle">Visual map of all entity relationships in your tenant</p>
-          </div>
-          <button class="btn btn-sm" onclick="loadGraph()">↺ Refresh</button>
+            <p class="login-footnote">
+                Your key is stored in <code>sessionStorage</code> only — it is cleared when the tab closes.
+            </p>
         </div>
-        <div class="page-content">
-          <div class="graph-toolbar">
-            <input type="text" id="graphSearch" placeholder="Search node (e.g. user:arjun)" class="graph-search-input">
-            <button class="btn btn-sm" onclick="searchGraph()">Find</button>
-            <button class="btn-ghost btn-sm" onclick="resetGraph()">Show All</button>
-            <span class="graph-legend">
-              <span class="legend-dot" style="background:#6366f1"></span>user
-              <span class="legend-dot" style="background:#10b981"></span>group
-              <span class="legend-dot" style="background:#f59e0b"></span>zone
-              <span class="legend-dot" style="background:#3b82f6"></span>resource
-              <span class="legend-dot" style="background:#8b5cf6"></span>other
-            </span>
-          </div>
-          <div class="graph-container">
-            <svg id="graphSvg" class="graph-svg"></svg>
-            <div class="graph-empty" id="graphEmpty">
-              <p>No relationships found. Add some tuples to see the graph.</p>
-            </div>
-            <div class="graph-node-panel" id="graphNodePanel" style="display:none">
-              <div class="graph-node-title" id="graphNodeTitle"></div>
-              <div class="graph-node-type" id="graphNodeType"></div>
-              <div class="graph-node-relations" id="graphNodeRelations"></div>
-              <button class="btn-ghost btn-sm" style="margin-top:8px"
-                onclick="document.getElementById('graphNodePanel').style.display='none'">✕ Close</button>
-            </div>
-          </div>
-          <div class="graph-stats" id="graphStats"></div>
-        </div>
-      </div>
     </div>
-  </div>
 
-  <!-- Add Modal -->
-  <div class="modal-overlay" id="addModal">
-    <div class="modal">
-      <h2>Add Relationship</h2>
-      <div class="field"><label>Subject</label><input type="text" id="addSubject" placeholder="user:arjun">
-        <div class="hint">e.g. user:123, group:engineering</div>
-      </div>
-      <div class="field"><label>Relation</label><input type="text" id="addRelation" placeholder="editor">
-        <div class="hint">e.g. viewer, editor, owner, member</div>
-      </div>
-      <div class="field"><label>Object</label><input type="text" id="addObject" placeholder="doc:readme">
-        <div class="hint">e.g. doc:123, project:alpha</div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" onclick="hideAddModal()">Cancel</button>
-        <button class="btn btn-add" onclick="addTuple()">Add Relationship</button>
-      </div>
+    <!-- ─────────────────── MAIN APP ─────────────────── -->
+    <div id="app" class="app-container hidden">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    <span>Rune</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-btn active" data-tab="overview">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                    </svg>
+                    Activity Logs
+                </a>
+                <a href="#" class="nav-btn" data-tab="directory">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    Directory
+                </a>
+                <a href="#" class="nav-btn" data-tab="playground">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    Playground
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="btn-signout" id="signout-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    Sign out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- TAB: ACTIVITY LOGS -->
+            <section id="tab-overview" class="tab-content">
+                <header class="page-header">
+                    <div>
+                        <h1>Activity Logs</h1>
+                        <p class="subtitle">Recent authorization decisions across your tenant.</p>
+                    </div>
+                    <button class="btn btn-secondary" onclick="app.refreshLogs()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2v6h-6" />
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                            <path d="M3 22v-6h6" />
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
+                        Refresh
+                    </button>
+                </header>
+
+                <div class="card">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Subject</th>
+                                <th>Action</th>
+                                <th>Object</th>
+                                <th>Latency</th>
+                                <th>Time</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-tbody">
+                            <tr>
+                                <td colspan="7" class="empty-cell">Loading…</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB: DIRECTORY -->
+            <section id="tab-directory" class="tab-content hidden">
+                <header class="page-header">
+                    <div>
+                        <h1>Directory</h1>
+                        <p class="subtitle">Assign or remove relationships between subjects and resources.</p>
+                    </div>
+                </header>
+
+                <div class="card p-6 mb-6">
+                    <h2 class="section-title">Assign Access</h2>
+                    <form id="form-assign-access" class="inline-form">
+                        <div class="form-group flex-1">
+                            <label>Subject (Who?)</label>
+                            <input type="text" id="assign-subject" class="input w-full" placeholder="user:alice">
+                        </div>
+                        <div class="form-group">
+                            <label>Relation</label>
+                            <select id="assign-relation" class="input">
+                                <option value="viewer">viewer</option>
+                                <option value="editor">editor</option>
+                                <option value="owner">owner</option>
+                                <option value="member">member</option>
+                            </select>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Object (To what?)</label>
+                            <input type="text" id="assign-object" class="input w-full" placeholder="doc:report">
+                        </div>
+                        <button type="submit" class="btn btn-primary align-end">Add</button>
+                    </form>
+                    <div id="assign-status" class="status-msg hidden"></div>
+                </div>
+
+                <div class="card p-6">
+                    <h2 class="section-title">Revoke Access</h2>
+                    <form id="form-delete-access" class="inline-form">
+                        <div class="form-group flex-1">
+                            <label>Subject</label>
+                            <input type="text" id="delete-subject" class="input w-full" placeholder="user:alice">
+                        </div>
+                        <div class="form-group">
+                            <label>Relation</label>
+                            <input type="text" id="delete-relation" class="input" placeholder="viewer">
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Object</label>
+                            <input type="text" id="delete-object" class="input w-full" placeholder="doc:report">
+                        </div>
+                        <button type="submit" class="btn btn-danger align-end">Remove</button>
+                    </form>
+                    <div id="delete-status" class="status-msg hidden"></div>
+                </div>
+            </section>
+
+            <!-- TAB: PLAYGROUND -->
+            <section id="tab-playground" class="tab-content hidden">
+                <header class="page-header">
+                    <div>
+                        <h1>Playground</h1>
+                        <p class="subtitle">Simulate access checks and visualize the BFS decision trace.</p>
+                    </div>
+                </header>
+
+                <div class="playground-grid">
+                    <div class="card p-6">
+                        <h2 class="section-title">Simulate Request</h2>
+                        <form id="form-test-access">
+                            <div class="form-group mb-4">
+                                <label>Subject (Who?)</label>
+                                <input type="text" id="test-subject" class="input w-full" placeholder="user:arjun">
+                            </div>
+                            <div class="form-group mb-4">
+                                <label>Action</label>
+                                <select id="test-action" class="input w-full">
+                                    <option value="read">read</option>
+                                    <option value="edit">edit</option>
+                                    <option value="delete">delete</option>
+                                    <option value="manage">manage</option>
+                                </select>
+                            </div>
+                            <div class="form-group mb-6">
+                                <label>Object (On what?)</label>
+                                <input type="text" id="test-object" class="input w-full" placeholder="shipment:TN001">
+                            </div>
+                            <button type="submit" id="test-btn" class="btn btn-primary w-full">Run Test</button>
+                        </form>
+                    </div>
+
+                    <div class="card p-6 playground-result">
+                        <h2 class="section-title">Decision</h2>
+                        <div id="test-result-container" class="result-empty">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                                style="color:var(--border)">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                            </svg>
+                            <p>Run a test to see the BFS trace.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
-  </div>
 
-  <script src="/v1/admin/app.js"></script>
+    <script src="./app.js"></script>
 </body>
 
 </html>

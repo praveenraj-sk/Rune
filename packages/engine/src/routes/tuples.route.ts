@@ -5,8 +5,10 @@
  * Both routes:
  * 1. Require auth (x-api-key)
  * 2. Validate relation is one of 4 valid values
- * 3. Increment LVN on every write
- * 4. Wipe tenant cache on every write (cache invalidation)
+ * 3. Increment LVN on every write — also updates in-memory LVN (Priority 1 fix)
+ * 4. Targeted cache invalidation on every write (Priority 2 fix)
+ *    - Old: cache.deleteByTenant() → wipes ALL entries for the tenant
+ *    - New: cache.deleteByChanged() → wipes only entries affected by this tuple change
  */
 import type { FastifyInstance } from 'fastify'
 import { authMiddleware } from '../middleware/auth.js'
@@ -16,6 +18,7 @@ import { query, getClient } from '../db/client.js'
 import { logger } from '../logger/index.js'
 import { indexGrant, removeGrant } from '../db/permission-index.js'
 import { getValidRelations, extractResourceType } from '../policy/config.js'
+import { updateLocalLvn } from '../engine/lvn.js'
 
 const bodySchema = {
     type: 'object',
@@ -103,7 +106,9 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
 
                 // Get next LVN and insert tuple atomically — prevents partial writes
                 const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-                lvn = parseInt(lvnResult.rows[0]?.nextval ?? '1', 10)
+                const nextval = lvnResult.rows[0]?.nextval
+                if (!nextval) throw new Error('lvn_seq returned no rows — possible DB fault')
+                lvn = parseInt(nextval, 10)
 
                 // Upsert — idempotent
                 await client.query(
@@ -122,10 +127,26 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
                 client.release()
             }
 
-            // Wipe all cached decisions for this tenant — any permission may have changed
-            cache.deleteByTenant(tenantId)
+            // Priority 1 fix: update in-memory LVN so can() reads don't need a DB query
+            updateLocalLvn(lvn)
 
-            // Update permission index — fire-and-forget (never blocks response)
+            // Priority 2 fix: targeted invalidation — only wipe entries affected by this tuple
+            // instead of wiping all 10,000+ entries for the entire tenant
+            cache.deleteByChanged(tenantId, subject, object)
+
+            // Permission index — fire-and-forget (never blocks response).
+            //
+            // INTENTIONAL EVENTUAL CONSISTENCY (Phase 1 documented tradeoff):
+            // The index is updated AFTER the 200 response is sent, so there is a
+            // ~50ms window where the index is stale after a write. During this window:
+            //   - permission index lookup → MISS (index not yet updated)
+            //   - BFS fallback runs      → ALLOW (correct, just slightly slower)
+            //
+            // This is SAFE — BFS is always the authoritative fallback.
+            // On high-write systems, the index hit rate will drop under heavy write load.
+            //
+            // Phase 2 fix: await the index update inside the transaction,
+            // or use a write-through queue to guarantee synchronous index updates.
             const resourceType = extractResourceType(object)
             const allActions = ['read', 'edit', 'delete', 'manage', 'write', 'approve']
             const grantedActions = allActions.filter(a => getValidRelations(a, resourceType).includes(relation))
@@ -165,7 +186,9 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
                 )
 
                 const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-                lvn = parseInt(lvnResult.rows[0]?.nextval ?? '1', 10)
+                const nextval = lvnResult.rows[0]?.nextval
+                if (!nextval) throw new Error('lvn_seq returned no rows — possible DB fault')
+                lvn = parseInt(nextval, 10)
 
                 await client.query('COMMIT')
             } catch (err) {
@@ -175,8 +198,11 @@ export async function tuplesRoute(fastify: FastifyInstance): Promise<void> {
                 client.release()
             }
 
-            // Wipe tenant cache after every write
-            cache.deleteByTenant(tenantId)
+            // Priority 1 fix: update in-memory LVN
+            updateLocalLvn(lvn)
+
+            // Priority 2 fix: targeted invalidation — only wipe entries affected by this tuple
+            cache.deleteByChanged(tenantId, subject, object)
 
             // Clean up permission index for this specific tuple — fire-and-forget
             removeGrant(tenantId, subject, relation, object)

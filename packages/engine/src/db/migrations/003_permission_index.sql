@@ -18,10 +18,12 @@ CREATE TABLE IF NOT EXISTS permission_index (
   PRIMARY KEY (tenant_id, subject, action, object)
 );
 
--- Primary lookup: can this subject do this action on this object?
-CREATE INDEX IF NOT EXISTS idx_perm_lookup
-  ON permission_index (tenant_id, subject, action, object);
+-- NOTE: idx_perm_lookup was removed — it indexed (tenant_id, subject, action, object)
+-- which is IDENTICAL to the PRIMARY KEY. PostgreSQL automatically creates a B-tree index
+-- for every PRIMARY KEY, so this was an exact duplicate costing double the write I/O.
+-- The primary lookup (can this subject do this action on this object?) is served by the PK.
 
--- Cleanup: remove all entries for a specific tuple when it's deleted
+-- Cleanup: remove all entries derived from a specific tuple when it's deleted.
+-- Indexes (tenant_id, granted_by) — different columns from the PK, not redundant.
 CREATE INDEX IF NOT EXISTS idx_perm_granted_by
   ON permission_index (tenant_id, granted_by);

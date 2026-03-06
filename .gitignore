@@ -9,3 +9,4 @@ coverage/
 *.log
 .DS_Store
 docs/CREDENTIALS.md
+.env.production
