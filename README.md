@@ -13,7 +13,7 @@
 |---|---|
 | [Development](docs/DEVELOPMENT.md) | Setup, env vars, project structure, common issues |
 | [Testing](docs/TESTING.md) | Running tests, writing tests, security attack suite |
-| [Contributing](docs/CONTRIBUTING.md) | Branch naming, commit style, PR checklist, code rules |
+| [Contributing](CONTRIBUTING.md) | Branch naming, commit style, PR checklist, code rules |
 | [Publishing](docs/PUBLISHING.md) | How to release a new SDK version to npm |
 | [SDK Guide](docs/SDK-GUIDE.md) | Full SDK API reference + Express/Fastify integration |
 | [Architecture](docs/ARCHITECTURE.md) | BFS algorithm, data model, caching, security design |
