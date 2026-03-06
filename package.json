@@ -2,6 +2,7 @@
   "name": "rune",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Rune — Relationship-based authorization engine",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
