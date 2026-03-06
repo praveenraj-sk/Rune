@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url'
 import { createHash, timingSafeEqual } from 'crypto'
 import { authMiddleware } from '../middleware/auth.js'
 import { adminOnly } from '../middleware/admin-only.js'
+import { adminRateLimitMiddleware } from '../middleware/rate-limit.js'
 import { can } from '../engine/can.js'
 import { logger } from '../logger/index.js'
 import { config } from '../config/index.js'
@@ -37,6 +38,13 @@ const dashboardHtml = loadFile('index.html', '<html><body><h1>Dashboard not foun
 const dashboardCss = loadFile('styles.css', '')
 const dashboardJs = loadFile('app.js', '')
 
+const tupleSchemaProps = {
+    tenantId: { type: 'string', minLength: 1 },
+    subject: { type: 'string', minLength: 1 },
+    relation: { type: 'string', minLength: 1 },
+    object: { type: 'string', minLength: 1 },
+}
+
 export async function adminRoute(fastify: FastifyInstance): Promise<void> {
 
     /**
@@ -47,24 +55,8 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
      *
      * Returns 200 if the key matches, 401 if not set or wrong, 403 if dashboard disabled.
      */
-    fastify.get('/admin/verify', async (request, reply) => {
-        if (!config.admin.apiKeyHash) {
-            return reply.status(403).send({ error: 'admin_dashboard_disabled' })
-        }
-
-        const rawKey = request.headers['x-api-key']
-        if (!rawKey || typeof rawKey !== 'string') {
-            return reply.status(401).send({ error: 'missing_api_key' })
-        }
-
-        const keyHash = createHash('sha256').update(rawKey).digest('hex')
-        const a = Buffer.from(keyHash)
-        const b = Buffer.from(config.admin.apiKeyHash ?? '')
-        if (a.length !== b.length || !timingSafeEqual(a, b)) {
-            logger.warn({ ip: request.ip }, 'admin_verify_denied')
-            return reply.status(401).send({ error: 'invalid_admin_key' })
-        }
-
+    fastify.get('/admin/verify', { preHandler: [adminRateLimitMiddleware] }, async (request, reply) => {
+        if (!await guardAdmin(request, reply)) return
         logger.info({ ip: request.ip }, 'admin_verify_success')
         return reply.status(200).send({ ok: true })
     })
@@ -143,11 +135,7 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
                         items: {
                             type: 'object',
                             required: ['subject', 'action', 'object'],
-                            properties: {
-                                subject: { type: 'string', minLength: 1 },
-                                action: { type: 'string', minLength: 1 },
-                                object: { type: 'string', minLength: 1 },
-                            },
+                            properties: tupleSchemaProps,
                         },
                     },
                 },
@@ -210,6 +198,7 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
         const a = Buffer.from(keyHash)
         const b = Buffer.from(config.admin.apiKeyHash ?? '')
         if (a.length !== b.length || !timingSafeEqual(a, b)) {
+            logger.warn({ ip: request.ip }, 'admin_verify_denied')
             await reply.status(401).send({ error: 'invalid_admin_key' })
             return false
         }
@@ -296,39 +285,28 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
             body: {
                 type: 'object',
                 required: ['tenantId', 'subject', 'relation', 'object'],
-                properties: {
-                    tenantId: { type: 'string', minLength: 1 },
-                    subject: { type: 'string', minLength: 1 },
-                    relation: { type: 'string', minLength: 1 },
-                    object: { type: 'string', minLength: 1 },
-                },
+                properties: tupleSchemaProps,
             },
         },
     }, async (request, reply) => {
         if (!await guardAdmin(request, reply)) return
 
         const { tenantId, subject, relation, object } = request.body
-        const { getClient } = await import('../db/client.js')
+        const { withLvnTransaction } = await import('../db/client.js')
         const { cache } = await import('../cache/lru.js')
         const { updateLocalLvn } = await import('../engine/lvn.js')
         const { indexGrant } = await import('../db/permission-index.js')
         const { getValidRelations, extractResourceType } = await import('../policy/config.js')
 
-        const client = await getClient()
         try {
-            await client.query('BEGIN')
-            const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-            const nextvalA = lvnResult.rows[0]?.nextval
-            if (!nextvalA) throw new Error('lvn_seq returned no rows — possible DB fault')
-            const lvn = parseInt(nextvalA, 10)
-
-            await client.query(
-                `INSERT INTO tuples (tenant_id, subject, relation, object, lvn)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (tenant_id, subject, relation, object) DO UPDATE SET lvn = EXCLUDED.lvn`,
-                [tenantId, subject, relation, object, lvn]
-            )
-            await client.query('COMMIT')
+            const lvn = await withLvnTransaction(async (client, nextLvn) => {
+                await client.query(
+                    `INSERT INTO tuples (tenant_id, subject, relation, object, lvn)
+                     VALUES ($1, $2, $3, $4, $5)
+                     ON CONFLICT (tenant_id, subject, relation, object) DO UPDATE SET lvn = EXCLUDED.lvn`,
+                    [tenantId, subject, relation, object, nextLvn]
+                )
+            })
 
             updateLocalLvn(lvn)
             cache.deleteByChanged(tenantId, subject, object)
@@ -342,11 +320,8 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
             logger.info({ tenantId, subject, relation, object, lvn }, 'admin_tuple_added')
             return reply.status(200).send({ success: true, lvn })
         } catch (err) {
-            await client.query('ROLLBACK').catch(() => { })
             logger.error({ err }, 'admin_tuple_add_failed')
             return reply.status(500).send({ error: 'internal_error' })
-        } finally {
-            client.release()
         }
     })
 
@@ -358,35 +333,25 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
             body: {
                 type: 'object',
                 required: ['tenantId', 'subject', 'relation', 'object'],
-                properties: {
-                    tenantId: { type: 'string', minLength: 1 },
-                    subject: { type: 'string', minLength: 1 },
-                    relation: { type: 'string', minLength: 1 },
-                    object: { type: 'string', minLength: 1 },
-                },
+                properties: tupleSchemaProps,
             },
         },
     }, async (request, reply) => {
         if (!await guardAdmin(request, reply)) return
 
         const { tenantId, subject, relation, object } = request.body
-        const { getClient } = await import('../db/client.js')
+        const { withLvnTransaction } = await import('../db/client.js')
         const { cache } = await import('../cache/lru.js')
         const { updateLocalLvn } = await import('../engine/lvn.js')
         const { removeGrant } = await import('../db/permission-index.js')
 
-        const client = await getClient()
         try {
-            await client.query('BEGIN')
-            await client.query(
-                `DELETE FROM tuples WHERE tenant_id=$1 AND subject=$2 AND relation=$3 AND object=$4`,
-                [tenantId, subject, relation, object]
-            )
-            const lvnResult = await client.query<{ nextval: string }>(`SELECT nextval('lvn_seq') as nextval`)
-            const nextvalA = lvnResult.rows[0]?.nextval
-            if (!nextvalA) throw new Error('lvn_seq returned no rows — possible DB fault')
-            const lvn = parseInt(nextvalA, 10)
-            await client.query('COMMIT')
+            const lvn = await withLvnTransaction(async (client) => {
+                await client.query(
+                    `DELETE FROM tuples WHERE tenant_id=$1 AND subject=$2 AND relation=$3 AND object=$4`,
+                    [tenantId, subject, relation, object]
+                )
+            })
 
             updateLocalLvn(lvn)
             cache.deleteByChanged(tenantId, subject, object)
@@ -396,11 +361,8 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
             logger.info({ tenantId, subject, relation, object }, 'admin_tuple_removed')
             return reply.status(200).send({ success: true })
         } catch (err) {
-            await client.query('ROLLBACK').catch(() => { })
             logger.error({ err }, 'admin_tuple_delete_failed')
             return reply.status(500).send({ error: 'internal_error' })
-        } finally {
-            client.release()
         }
     })
 
@@ -412,12 +374,7 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
             body: {
                 type: 'object',
                 required: ['tenantId', 'subject', 'action', 'object'],
-                properties: {
-                    tenantId: { type: 'string', minLength: 1 },
-                    subject: { type: 'string', minLength: 1 },
-                    action: { type: 'string', minLength: 1 },
-                    object: { type: 'string', minLength: 1 },
-                },
+                properties: tupleSchemaProps,
             },
         },
     }, async (request, reply) => {
