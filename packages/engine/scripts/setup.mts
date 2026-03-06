@@ -13,8 +13,6 @@
  * 3. Creates a new tenant + API key
  * 4. Prints the key and a quickstart snippet
  */
-import { createHash, randomBytes } from 'crypto'
-import { readFileSync } from 'fs'
 import { createInterface } from 'readline'
 import { resolve } from 'path'
 import { config as loadEnv } from 'dotenv'
@@ -40,22 +38,7 @@ const c = {
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 const ask = (q: string): Promise<string> => new Promise((res) => rl.question(q, res))
 
-function generateApiKey(): string {
-    return `rune_${randomBytes(24).toString('base64url')}`
-}
-
-function hashKey(key: string): string {
-    return createHash('sha256').update(key).digest('hex')
-}
-
-function generateTenantId(): string {
-    const b = randomBytes(16)
-    b[6] = (b[6]! & 0x0f) | 0x40
-    b[8] = (b[8]! & 0x3f) | 0x80
-    const hex = b.toString('hex')
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
-}
-
+import { generateApiKey, hashKey, generateTenantId } from '../src/db/setup.js'
 async function main(): Promise<void> {
     console.log()
     console.log(c.bold(c.blue('  🌿 Rune — First-time Setup')))
@@ -85,11 +68,17 @@ async function main(): Promise<void> {
     }
 
     // Step 3: Run schema (idempotent)
-    process.stdout.write('  Applying database schema... ')
+    // Step 3: Run migrations
+    process.stdout.write('  Running database migrations... ')
     try {
-        const schemaPath = resolve(process.cwd(), 'src/db/schema.sql')
-        const schema = readFileSync(schemaPath, 'utf8')
-        await pool.query(schema)
+        const { default: runner } = await import('node-pg-migrate')
+        await runner({
+            databaseUrl: dbUrl,
+            dir: resolve(process.cwd(), 'migrations'),
+            direction: 'up',
+            log: () => { }, // silence output for clean CLI
+            migrationsTable: 'pgmigrations'
+        })
         console.log(c.green('✓'))
     } catch (err) {
         console.log(c.red('✗'))

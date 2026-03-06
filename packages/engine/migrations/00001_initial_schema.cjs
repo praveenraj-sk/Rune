@@ -1,3 +1,4 @@
+exports.up = (pgm) => { pgm.sql(`
 -- Rune Database Schema — Phase 1
 -- Run once: psql $DATABASE_URL -f schema.sql
 -- Uses IF NOT EXISTS on all objects so it's safe to re-run.
@@ -116,3 +117,5 @@ CREATE TABLE IF NOT EXISTS permission_index (
 -- when that tuple is deleted. Different columns from the PRIMARY KEY — not redundant.
 CREATE INDEX IF NOT EXISTS idx_perm_granted_by
   ON permission_index (tenant_id, granted_by);
+`); };
+exports.down = (pgm) => { pgm.sql(`DROP TABLE IF EXISTS permission_index, api_keys, decision_logs, schemas, tuples; DROP SEQUENCE IF EXISTS lvn_seq;`); };

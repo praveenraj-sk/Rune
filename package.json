@@ -16,10 +16,14 @@
     "benchmark": "pnpm --filter engine benchmark",
     "db:schema": "psql $DATABASE_URL -f packages/engine/src/db/schema.sql",
     "db:seed": "psql $DATABASE_URL -f packages/engine/src/db/seed.sql",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "prepare": "husky"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
-  ]
+  ],
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
 }

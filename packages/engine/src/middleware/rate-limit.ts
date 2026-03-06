@@ -1,19 +1,21 @@
 /**
- * Rate limiter middleware — sliding window per authenticated API key.
+ * Rate limiter middleware — TWO layers of protection:
  *
- * IMPORTANT: Must run AFTER authMiddleware so the limit is applied per
- * authenticated key (tenant-level), not per raw IP.
+ * 1. PER-API-KEY rate limit (rateLimitMiddleware)
+ *    Runs AFTER authMiddleware. Limits per authenticated key (tenant-level).
  *
- * Usage in routes:
- *   preHandler: [authMiddleware, rateLimitMiddleware]
+ * 2. PER-IP rate limit (ipRateLimitMiddleware)
+ *    Runs BEFORE auth. Limits per raw IP. Stops brute-force attacks on
+ *    /admin/* endpoints and prevents abuse from compromised API keys.
  *
  * Config (env vars):
- *   RATE_LIMIT_MAX        — max requests per window (default: 100)
+ *   RATE_LIMIT_MAX        — max requests per window per API key (default: 100)
  *   RATE_LIMIT_WINDOW_MS  — window duration in ms (default: 10000)
  *
  * Memory safety:
  *   A setInterval runs every window duration to clear expired entries,
- *   preventing unbounded Map growth from inactive API keys.
+ *   preventing unbounded Map growth from inactive API keys / IPs.
+ *   Max Map size capped at 100,000 entries to prevent DoS via unique IPs.
  */
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import { config } from '../config/index.js'
@@ -24,16 +26,31 @@ type WindowEntry = {
     windowStart: number
 }
 
-const counters = new Map<string, WindowEntry>()
+const MAX_MAP_SIZE = 100_000
+
+const apiKeyCounters = new Map<string, WindowEntry>()
+const ipCounters = new Map<string, WindowEntry>()
+
+// IP rate limit: 200 req per window (2x the API key limit — generous for legitimate users)
+const IP_MAX_REQUESTS = 200
+
+// Admin rate limit: 20 req per window (strict — admin endpoints are rarely called in bulk)
+const ADMIN_MAX_REQUESTS = 20
 
 // ── Periodic cleanup — remove entries that have expired ──────────────────────
 
 const cleanupInterval = setInterval(() => {
     const now = Date.now()
     let removed = 0
-    for (const [key, entry] of counters) {
+    for (const [key, entry] of apiKeyCounters) {
         if (now - entry.windowStart > config.rateLimit.windowMs) {
-            counters.delete(key)
+            apiKeyCounters.delete(key)
+            removed++
+        }
+    }
+    for (const [key, entry] of ipCounters) {
+        if (now - entry.windowStart > config.rateLimit.windowMs) {
+            ipCounters.delete(key)
             removed++
         }
     }
@@ -43,35 +60,70 @@ const cleanupInterval = setInterval(() => {
 // Allow the process to exit even if this interval is still running
 cleanupInterval.unref()
 
-// ── Middleware ───────────────────────────────────────────────────────────────
+// ── Shared check function ────────────────────────────────────────────────────
+
+function checkLimit(
+    counters: Map<string, WindowEntry>,
+    key: string,
+    maxRequests: number,
+    windowMs: number,
+): boolean {
+    // Prevent unbounded Map growth from unique keys (DoS protection)
+    if (counters.size > MAX_MAP_SIZE && !counters.has(key)) {
+        return false  // reject when map is full and this is a new entry
+    }
+
+    const now = Date.now()
+    let entry = counters.get(key)
+
+    if (!entry || now - entry.windowStart > windowMs) {
+        entry = { count: 1, windowStart: now }
+        counters.set(key, entry)
+        return true
+    }
+
+    entry.count++
+    return entry.count <= maxRequests
+}
+
+// ── Per-API-Key Middleware (runs AFTER auth) ─────────────────────────────────
 
 export async function rateLimitMiddleware(
     request: FastifyRequest,
     reply: FastifyReply,
 ): Promise<void> {
     const apiKey = request.headers['x-api-key']
-    if (!apiKey || typeof apiKey !== 'string') {
-        // authMiddleware already rejected this — let it pass through
-        return
-    }
+    if (!apiKey || typeof apiKey !== 'string') return
 
-    const now = Date.now()
-    const { maxRequests, windowMs } = config.rateLimit
-
-    let entry = counters.get(apiKey)
-
-    if (!entry || now - entry.windowStart > windowMs) {
-        // New window
-        entry = { count: 1, windowStart: now }
-        counters.set(apiKey, entry)
-        return
-    }
-
-    entry.count++
-
-    if (entry.count > maxRequests) {
-        logger.warn({ ip: request.ip, count: entry.count }, 'rate_limit_exceeded')
+    if (!checkLimit(apiKeyCounters, apiKey, config.rateLimit.maxRequests, config.rateLimit.windowMs)) {
+        logger.warn({ ip: request.ip }, 'rate_limit_exceeded')
         await reply.status(429).send({ error: 'rate_limit_exceeded' })
-        return
+    }
+}
+
+// ── Per-IP Middleware (runs BEFORE auth — catches unauthenticated abuse) ─────
+
+export async function ipRateLimitMiddleware(
+    request: FastifyRequest,
+    reply: FastifyReply,
+): Promise<void> {
+    const ip = request.ip
+    if (!checkLimit(ipCounters, ip, IP_MAX_REQUESTS, config.rateLimit.windowMs)) {
+        logger.warn({ ip }, 'ip_rate_limit_exceeded')
+        await reply.status(429).send({ error: 'rate_limit_exceeded' })
+    }
+}
+
+// ── Admin Rate Limit (stricter — 20 req/window) ─────────────────────────────
+
+export async function adminRateLimitMiddleware(
+    request: FastifyRequest,
+    reply: FastifyReply,
+): Promise<void> {
+    const ip = request.ip
+    const adminKey = `admin:${ip}`
+    if (!checkLimit(ipCounters, adminKey, ADMIN_MAX_REQUESTS, config.rateLimit.windowMs)) {
+        logger.warn({ ip }, 'admin_rate_limit_exceeded')
+        await reply.status(429).send({ error: 'rate_limit_exceeded' })
     }
 }
