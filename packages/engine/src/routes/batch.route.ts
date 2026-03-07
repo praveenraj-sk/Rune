@@ -28,7 +28,7 @@
  * }
  */
 import type { FastifyInstance } from 'fastify'
-import { authMiddleware } from '../middleware/auth.js'
+import { apiKeyOrJwtMiddleware } from '../middleware/auth.js'
 import { rateLimitMiddleware } from '../middleware/rate-limit.js'
 import { can } from '../engine/can.js'
 
@@ -43,7 +43,7 @@ export async function batchRoute(fastify: FastifyInstance): Promise<void> {
             }>
         }
     }>('/can/batch', {
-        preHandler: [authMiddleware, rateLimitMiddleware],
+        preHandler: [apiKeyOrJwtMiddleware, rateLimitMiddleware],
         schema: {
             body: {
                 type: 'object',
@@ -55,8 +55,9 @@ export async function batchRoute(fastify: FastifyInstance): Promise<void> {
                         maxItems: 25,
                         items: {
                             type: 'object',
-                            required: ['subject', 'action', 'object'],
+                            required: ['action', 'object'],
                             properties: {
+                                // subject optional when using JWT auth — resolved from token
                                 subject: { type: 'string', minLength: 1 },
                                 action:  { type: 'string', minLength: 1 },
                                 object:  { type: 'string', minLength: 1 },
@@ -72,20 +73,36 @@ export async function batchRoute(fastify: FastifyInstance): Promise<void> {
         },
     }, async (request, reply) => {
         const tenantId = request.tenantId
+        // JWT auth: subject from verified token — body subject ignored (zero client trust)
+        // API key auth: subject from each check in the body
+        const jwtSubject = request.jwtSubject
         const start = performance.now()
 
         // Run all checks in parallel — each can() is independent
         const results = await Promise.all(
             request.body.checks.map(async (check) => {
+                const subject = jwtSubject ?? check.subject
+                if (!subject) {
+                    return {
+                        subject: check.subject ?? '',
+                        action: check.action,
+                        object: check.object,
+                        decision: 'deny' as const,
+                        status: 'DENY',
+                        cache_hit: false,
+                        latency_ms: 0,
+                        error: 'subject required (or use JWT auth with sub claim)',
+                    }
+                }
                 const result = await can({
-                    subject: check.subject,
+                    subject,
                     action: check.action,
                     object: check.object,
                     tenantId,
                     ...(check.sct ? { sct: check.sct } : {}),
                 })
                 return {
-                    subject: check.subject,
+                    subject,
                     action: check.action,
                     object: check.object,
                     decision: result.decision,

@@ -109,3 +109,13 @@ export type HealthStatus = {
 
 /** Any action string — built-in: 'read' | 'edit' | 'delete' | 'manage', plus any custom action */
 export type Action = string
+
+/**
+ * Result of listAccessible() — all objects a subject can perform an action on.
+ * Backed by the materialised permission_index — O(1) lookup.
+ */
+export type AccessList = {
+    subject: string
+    action: string
+    objects: string[]
+}

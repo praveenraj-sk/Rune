@@ -80,6 +80,32 @@ const result = await rune.check({
 
 ---
 
+## Listing Accessible Objects
+
+Returns all objects a subject can perform an action on, resolved from the materialised permission index (O(1) — no BFS traversal).
+
+```ts
+const list = await rune.listAccessible({
+  subject: 'user:arjun',
+  action:  'read',
+})
+// list.objects → ['shipment:TN001', 'shipment:TN002', ...]
+```
+
+**Response type:**
+
+```ts
+{
+  subject: string
+  action:  string
+  objects: string[]
+}
+```
+
+Useful for rendering "what resources can this user see?" in a UI without querying each resource individually.
+
+---
+
 ## Managing Relationships (Tuples)
 
 ### Relations

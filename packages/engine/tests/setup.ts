@@ -16,6 +16,18 @@ import { createHash } from 'crypto'
 // MUST run before any dynamic import — loads DATABASE_URL into process.env
 config({ path: '../../.env', override: true })
 
+// Set JWT_SECRET for tests — ensures JWT middleware is testable.
+// Only sets if not already provided by .env so local overrides are respected.
+if (!process.env['JWT_SECRET']) {
+    process.env['JWT_SECRET'] = 'test-jwt-secret-for-unit-tests-minimum-32-chars'
+}
+
+// Set JWKS_URI for RS256 tests — points to a fake URL intercepted by mocked fetch.
+// Must be set here (before config singleton loads) so config.auth.jwksUri is populated.
+if (!process.env['JWKS_URI']) {
+    process.env['JWKS_URI'] = 'http://rune-test-jwks/.well-known/jwks.json'
+}
+
 if (!process.env['DATABASE_URL']) {
     throw new Error(
         'DATABASE_URL is not set. Copy .env.example to .env and configure it.\n' +

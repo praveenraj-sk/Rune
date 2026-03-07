@@ -23,18 +23,25 @@ To answer "can `user:arjun` read `shipment:TN001`?" — Rune runs **BFS** over t
 Client                    Engine
   │                         │
   ├─ POST /v1/can ─────────►│
-  │                         ├─ 1. authMiddleware (SHA-256 key hash lookup)
-  │                         ├─ 2. rateLimitMiddleware (sliding window per API key)
-  │                         ├─ 3. JSON Schema validation (subject, action, object)
+  │                         ├─ 1. apiKeyOrJwtMiddleware
+  │                         │      ├─ x-api-key → SHA-256 hash → DB lookup → tenantId
+  │                         │      └─ Bearer → parse alg from JWT header
+  │                         │           ├─ HS256 → timingSafeEqual vs JWT_SECRET
+  │                         │           └─ RS256 → JWKS key cache → createVerify
+  │                         │         sets: request.tenantId + request.jwtSubject
+  │                         ├─ 2. rateLimitMiddleware (sliding window per API key/IP)
+  │                         ├─ 3. JSON Schema validation (action + object required; subject optional with JWT)
   │                         ├─ 4. can() function
-  │                         │      ├─ Input validation (fail closed)
+  │                         │      ├─ subject = jwtSubject ?? body.subject  (JWT wins)
+  │                         │      ├─ Input validation (fail closed on any empty field)
   │                         │      ├─ Build cache key
-  │                         │      ├─ SCT staleness check
-  │                         │      ├─ LRU cache lookup
-  │                         │      ├─ BFS traversal (if cache miss)
+  │                         │      ├─ SCT staleness check → bypass cache if stale
+  │                         │      ├─ LRU cache lookup → return if hit
+  │                         │      ├─ Permission index O(1) lookup → return if hit
+  │                         │      ├─ BFS traversal (batched: 1 query per depth level)
   │                         │      ├─ Build trace + reason + suggested_fix
-  │                         │      ├─ Get current LVN
-  │                         │      ├─ Cache result
+  │                         │      ├─ Get current LVN (in-memory, zero DB cost)
+  │                         │      ├─ Cache result (DENY caches suggested_fix too)
   │                         │      └─ Fire-and-forget: log decision to DB
   │                         ├─ 5. Return Permission
   │◄────────────────────────┤

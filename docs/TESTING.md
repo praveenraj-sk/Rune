@@ -4,10 +4,10 @@
 
 | Suite | Command | Tests | What it covers |
 |---|---|---|---|
-| Engine (all) | `pnpm test` | 69 | Unit + integration |
+| Engine (all) | `pnpm test` | 164 | Unit + integration |
 | Engine (security) | `pnpm test:security` | 10 | Attack scenarios |
-| SDK | `pnpm test:sdk` | 18 | Client API |
-| All | `pnpm test:all` | 87 | Everything |
+| SDK | `pnpm test:sdk` | 30 | Client API |
+| All | `pnpm test:all` | 194 | Everything |
 | Typecheck | `pnpm run typecheck` | — | TypeScript errors |
 
 ---
@@ -66,20 +66,29 @@ cd packages/sdk && pnpm exec vitest run
 
 ```
 packages/engine/tests/
-├── setup.ts                        # Global: loads .env, seeds test API keys
+├── setup.ts                        # Global: loads .env, seeds test API keys, sets JWT_SECRET + JWKS_URI
 ├── fixtures/
 │   └── tuples.ts                   # Reusable tenant + tuple data
 ├── helpers/
 │   └── test-app.ts                 # Shared Fastify test app factory
-└── integration/
+├── integration/
 │   ├── routes.test.ts              # HTTP route tests (11 tests)
-│   └── security.test.ts            # Attack scenarios (10 tests)
+│   ├── security.test.ts            # Attack scenarios (10 tests)
+│   ├── regression.test.ts          # Decision corpus — ALLOW/DENY/NOT_FOUND contracts (22 tests)
+│   ├── tenant-isolation.test.ts    # Cross-tenant data leakage prevention (7 tests)
+│   ├── contract.test.ts            # API response shape contracts (8 tests)
+│   ├── jwt.test.ts                 # JWT HS256 + attack vectors (10 tests)
+│   └── latency.test.ts             # P99 < 20ms gate on cached path (2 tests)
 └── unit/
     ├── bfs.test.ts                 # BFS traversal (8 tests)
     ├── can.test.ts                 # Authorization decisions (7 tests)
-    ├── cache.test.ts               # LRU cache (7 tests)
+    ├── cache.test.ts               # LRU cache (10 tests)
+    ├── chaos.test.ts               # DB failure → fail closed (6 tests)
     ├── db.test.ts                  # Database queries (18 tests)
-    └── failures.test.ts            # Error handling (8 tests)
+    ├── failures.test.ts            # Error handling (8 tests)
+    ├── jwks.test.ts                # JWKS/RS256 key cache + attack vectors (14 tests)
+    ├── observability.test.ts       # Metrics + logging (11 tests)
+    └── permission-index.test.ts    # O(1) index reads/writes (12 tests)
 ```
 
 ---
@@ -152,7 +161,7 @@ describe('My feature', () => {
 Run before every push:
 
 ```bash
-pnpm test:all         # all 87 tests must pass
+pnpm test:all         # all 194 tests must pass
 pnpm run typecheck    # TypeScript must compile clean
 ```
 

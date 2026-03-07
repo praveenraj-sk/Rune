@@ -2,7 +2,7 @@
 
 > Base URL: `http://localhost:4078/v1`
 
-All endpoints require an `x-api-key` header unless noted otherwise.
+All endpoints require authentication unless noted otherwise.
 Rate limits apply per API key (100 req/10s) and per IP (200 req/10s).
 Admin endpoints have a stricter limit (20 req/10s).
 
@@ -12,16 +12,29 @@ Every response includes an `x-request-id` header for log correlation.
 
 ## Authentication
 
-Include your API key in every request:
+Rune accepts two authentication methods on the same endpoints:
 
+**API Key (server-to-server)**
 ```
 x-api-key: rune_sk_your_key_here
 ```
 
+**JWT Bearer — HS256 (shared secret)**
+```
+Authorization: Bearer <hs256-signed-jwt>
+```
+Set `JWT_SECRET` env var on the engine. JWT payload must include `sub` (Rune subject), `tid` (tenant ID), and `exp` (expiry Unix seconds). When a JWT is used, the `sub` claim is the subject — any `subject` field in the request body is ignored.
+
+**JWT Bearer — RS256 (Auth0 / Cognito / Okta / Keycloak)**
+```
+Authorization: Bearer <rs256-signed-jwt>
+```
+Set `JWKS_URI` env var to your IdP's JWKS endpoint (e.g. `https://myapp.auth0.com/.well-known/jwks.json`). Public keys are cached in memory (60s TTL) and re-fetched automatically on key rotation (`kid` miss triggers one re-fetch).
+
 Unauthenticated requests receive:
 
 ```json
-{ "error": "unauthorized" }
+{ "error": "missing_credentials" }
 ```
 
 **Status Code:** `401 Unauthorized`
@@ -33,7 +46,10 @@ Unauthenticated requests receive:
 | HTTP Status | Error | When |
 |-------------|-------|------|
 | `400` | `bad_request` | Missing/invalid fields in request body |
-| `401` | `unauthorized` | Missing or invalid `x-api-key` |
+| `401` | `missing_credentials` | No `x-api-key` or `Authorization` header present |
+| `401` | `invalid_api_key` | API key not found in the database |
+| `401` | `invalid_token` | JWT signature invalid, expired, or missing required claims (`sub`, `tid`, `exp`) |
+| `401` | `jwt_not_configured` | Bearer token sent but neither `JWT_SECRET` nor `JWKS_URI` is configured |
 | `429` | `rate_limit_exceeded` | Too many requests (per key, IP, or admin) |
 | `500` | `internal_error` | Server error — check logs |
 | `503` | `service_unavailable` | Database is down |
@@ -63,7 +79,7 @@ curl -X POST http://localhost:4078/v1/can \
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `subject` | string | ✅ | The actor (e.g. `user:arjun`, `group:managers`) |
+| `subject` | string | ✅ (API key) / ❌ (JWT) | The actor. When using JWT auth, resolved from the token's `sub` claim — body value is ignored. |
 | `action` | string | ✅ | The action to check (e.g. `read`, `edit`, `delete`) |
 | `object` | string | ✅ | The target resource (e.g. `shipment:TN001`, `doc:report`) |
 | `context` | object | ❌ | Optional context (e.g. `{ "time": "2024-01-01" }`) |
@@ -158,7 +174,7 @@ curl -X POST http://localhost:4078/v1/can/batch \
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `checks` | array | ✅ | 1–25 permission checks |
-| `checks[].subject` | string | ✅ | The actor |
+| `checks[].subject` | string | ✅ (API key) / ❌ (JWT) | The actor. Resolved from JWT `sub` when using Bearer auth — body value ignored. |
 | `checks[].action` | string | ✅ | The action |
 | `checks[].object` | string | ✅ | The target resource |
 | `checks[].sct` | object | ❌ | Per-check staleness token |
@@ -173,6 +189,37 @@ curl -X POST http://localhost:4078/v1/can/batch \
     { "subject": "user:bob", "action": "read", "object": "doc:report", "decision": "deny", "status": "NOT_FOUND", "cache_hit": false, "latency_ms": 0.6 }
   ],
   "total_latency_ms": 4.8
+}
+```
+
+### `GET /v1/accessible` — List accessible objects
+
+Returns all objects a subject can perform an action on, resolved from the materialised permission index (O(1) — no BFS).
+
+When authenticated via JWT, `subject` is resolved from the token's `sub` claim.
+
+```bash
+curl "http://localhost:4078/v1/accessible?subject=user:arjun&action=read" \
+  -H "x-api-key: rune_sk_your_key"
+```
+
+**Query Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `subject` | string | ✅ (API key) / ❌ (JWT) | The actor |
+| `action` | string | ✅ | The action (e.g. `read`, `edit`) |
+
+**Response:**
+
+```json
+{
+  "subject": "user:arjun",
+  "action": "read",
+  "objects": [
+    "shipment:TN001",
+    "shipment:TN002"
+  ]
 }
 ```
 

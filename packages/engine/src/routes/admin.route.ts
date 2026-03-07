@@ -384,5 +384,67 @@ export async function adminRoute(fastify: FastifyInstance): Promise<void> {
         const result = await can({ subject, action, object, tenantId })
         return reply.status(200).send(result)
     })
+
+    /**
+     * GET /admin/accessible?tenantId=xxx&subject=user:alice[&action=read]
+     * What objects can this subject access? Optionally filter by action.
+     * Reads from permission_index — O(1) lookup, no BFS.
+     */
+    fastify.get<{
+        Querystring: { tenantId?: string; subject?: string; action?: string }
+    }>('/admin/accessible', async (request, reply) => {
+        if (!await guardAdmin(request, reply)) return
+
+        const { tenantId, subject, action } = request.query
+        if (!tenantId) return reply.status(400).send({ error: 'tenantId required' })
+        if (!subject) return reply.status(400).send({ error: 'subject required' })
+
+        try {
+            let sql = `SELECT action, object FROM permission_index WHERE tenant_id = $1 AND subject = $2`
+            const params: string[] = [tenantId, subject]
+            if (action) {
+                params.push(action)
+                sql += ` AND action = $3`
+            }
+            sql += ` ORDER BY action, object`
+
+            const result = await query<{ action: string; object: string }>(sql, params)
+            return reply.status(200).send({ subject, entries: result.rows })
+        } catch (err) {
+            logger.error({ err }, 'admin_accessible_failed')
+            return reply.status(500).send({ error: 'internal_error' })
+        }
+    })
+
+    /**
+     * GET /admin/whocan?tenantId=xxx&object=doc:readme[&action=read]
+     * Who has access to this object? Optionally filter by action.
+     * Reads from permission_index — O(1) lookup, no BFS.
+     */
+    fastify.get<{
+        Querystring: { tenantId?: string; object?: string; action?: string }
+    }>('/admin/whocan', async (request, reply) => {
+        if (!await guardAdmin(request, reply)) return
+
+        const { tenantId, object, action } = request.query
+        if (!tenantId) return reply.status(400).send({ error: 'tenantId required' })
+        if (!object) return reply.status(400).send({ error: 'object required' })
+
+        try {
+            let sql = `SELECT subject, action FROM permission_index WHERE tenant_id = $1 AND object = $2`
+            const params: string[] = [tenantId, object]
+            if (action) {
+                params.push(action)
+                sql += ` AND action = $3`
+            }
+            sql += ` ORDER BY subject, action`
+
+            const result = await query<{ subject: string; action: string }>(sql, params)
+            return reply.status(200).send({ object, entries: result.rows })
+        } catch (err) {
+            logger.error({ err }, 'admin_whocan_failed')
+            return reply.status(500).send({ error: 'internal_error' })
+        }
+    })
 }
 

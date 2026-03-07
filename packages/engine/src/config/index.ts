@@ -37,6 +37,20 @@ const configSchema = z.object({
         /** SHA-256 hash of ADMIN_API_KEY env var. Empty string = admin dashboard disabled. */
         apiKeyHash: z.string().default(''),
     }),
+    auth: z.object({
+        /**
+         * JWT secret for HS256 token verification.
+         * If set, /v1/can and /v1/accessible accept Bearer tokens in addition to API keys.
+         * Generate: openssl rand -hex 32
+         */
+        jwtSecret: z.string().optional(),
+        /**
+         * JWKS URI for RS256 token verification (Auth0, Cognito, Okta, Keycloak, etc.)
+         * Example: https://myapp.auth0.com/.well-known/jwks.json
+         * When set, Bearer tokens signed with RS256 are accepted alongside HS256.
+         */
+        jwksUri: z.string().url().optional(),
+    }),
 })
 
 export type Config = z.infer<typeof configSchema>
@@ -103,6 +117,10 @@ function loadConfig(): Config {
         },
         admin: {
             apiKeyHash: adminKeyHash,
+        },
+        auth: {
+            jwtSecret: process.env['JWT_SECRET'],
+            jwksUri: process.env['JWKS_URI'],
         },
     })
 

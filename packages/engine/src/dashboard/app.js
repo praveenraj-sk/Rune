@@ -83,6 +83,7 @@ const app = {
         this.setupTabs()
         this.setupForms()
         this.setupSignOut()
+        this.setupAccessExplorer()
         this.refreshLogs()
     },
 
@@ -239,6 +240,67 @@ const app = {
     },
 
     toggleTrace(i) { document.getElementById(`trace-${i}`)?.classList.toggle('hidden') },
+
+    // ─── Access Explorer ──────────────────────────────────────────────
+    setupAccessExplorer() {
+        document.getElementById('form-accessible').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const subject = document.getElementById('accessible-subject').value.trim()
+            const action = document.getElementById('accessible-action').value.trim()
+            if (!subject) return
+
+            const qs = new URLSearchParams({ tenantId: this.tenantId, subject })
+            if (action) qs.set('action', action)
+
+            try {
+                const data = await this.api(`/v1/admin/accessible?${qs}`)
+                const tbody = document.getElementById('accessible-tbody')
+                const container = document.getElementById('accessible-results')
+
+                if (!data.entries?.length) {
+                    tbody.innerHTML = '<tr><td colspan="2" class="empty-cell">No permissions found.</td></tr>'
+                } else {
+                    tbody.innerHTML = data.entries.map(e =>
+                        `<tr><td style="color:var(--text-muted)">${e.action}</td><td style="font-weight:500">${e.object}</td></tr>`
+                    ).join('')
+                }
+                container.classList.remove('hidden')
+            } catch (err) {
+                document.getElementById('accessible-tbody').innerHTML =
+                    `<tr><td colspan="2" class="empty-cell" style="color:var(--danger)">Error: ${err.message}</td></tr>`
+                document.getElementById('accessible-results').classList.remove('hidden')
+            }
+        })
+
+        document.getElementById('form-whocan').addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const object = document.getElementById('whocan-object').value.trim()
+            const action = document.getElementById('whocan-action').value.trim()
+            if (!object) return
+
+            const qs = new URLSearchParams({ tenantId: this.tenantId, object })
+            if (action) qs.set('action', action)
+
+            try {
+                const data = await this.api(`/v1/admin/whocan?${qs}`)
+                const tbody = document.getElementById('whocan-tbody')
+                const container = document.getElementById('whocan-results')
+
+                if (!data.entries?.length) {
+                    tbody.innerHTML = '<tr><td colspan="2" class="empty-cell">No permissions found.</td></tr>'
+                } else {
+                    tbody.innerHTML = data.entries.map(e =>
+                        `<tr><td style="font-weight:500">${e.subject}</td><td style="color:var(--text-muted)">${e.action}</td></tr>`
+                    ).join('')
+                }
+                container.classList.remove('hidden')
+            } catch (err) {
+                document.getElementById('whocan-tbody').innerHTML =
+                    `<tr><td colspan="2" class="empty-cell" style="color:var(--danger)">Error: ${err.message}</td></tr>`
+                document.getElementById('whocan-results').classList.remove('hidden')
+            }
+        })
+    },
 
     // ─── Directory ────────────────────────────────────────────────────
     async changeTuple(method, { subject, relation, object }, statusId) {

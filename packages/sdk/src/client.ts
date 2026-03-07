@@ -8,7 +8,7 @@
  * - Retry with exponential backoff (configurable)
  * - Circuit breaker pattern (configurable)
  */
-import type { RuneOptions, CacheStrategy, Permission, Grant, GrantResult, AuditLog, HealthStatus } from './types.js'
+import type { RuneOptions, CacheStrategy, Permission, Grant, GrantResult, AuditLog, HealthStatus, AccessList } from './types.js'
 import { LocalCache } from './cache.js'
 
 // ── Circuit Breaker State ────────────────────────────────────────────────────
@@ -311,6 +311,26 @@ export class RuneClient {
         // Invalidate local cache — permissions may have changed
         this.localCache?.clear()
         return result
+    }
+
+    /**
+     * List all objects a subject can perform an action on.
+     * Backed by the materialised permission_index — O(1) indexed lookup.
+     * Use this to populate lists/tables showing only what the user can see.
+     *
+     * @example
+     * const { objects } = await rune.listAccessible({ subject: 'user:alice', action: 'read' })
+     * // objects = ['doc:readme', 'doc:spec', ...]
+     * // app does: WHERE id IN (objects)
+     */
+    async listAccessible(params: {
+        subject: string
+        action: string
+        tenant?: string
+    }): Promise<AccessList> {
+        const qs = new URLSearchParams({ subject: params.subject, action: params.action })
+        if (params.tenant) qs.set('tenant', params.tenant)
+        return this.request<AccessList>('GET', `/v1/accessible?${qs}`)
     }
 
     /** Get recent decision audit log for this tenant */
