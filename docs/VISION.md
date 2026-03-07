@@ -68,7 +68,7 @@ Rune ships with an **Admin Dashboard** — a web UI embedded in the engine.
 
 A PM clicks **"Add Relationship"**, picks a user, role, and resource from dropdowns — done. No terminal, no code, no engineer needed.
 
-**What exists today:** Full API for managing relationships (`POST /v1/tuples`, `DELETE /v1/tuples`, `GET /v1/logs`). Dashboard UI is on the roadmap.
+**What exists today:** Full admin dashboard at `/admin` — login, activity log viewer, relationship directory, and a live permission playground. Backed by a full API (`POST /v1/tuples`, `DELETE /v1/tuples`, `GET /v1/logs`, `POST /admin/can`, etc.).
 
 ---
 
@@ -109,7 +109,7 @@ WHERE  user_id = 1 AND document_id = 5
 
 **Your database is the single source of truth. No sync. No ghosts. No nightmares.**
 
-**What exists today:** Traditional tuple store mode (Rune's own `tuples` table). Zero-sync adapter is on the roadmap — the biggest differentiator from every competitor.
+**What exists today:** Zero-Sync is fully implemented. Add a `datasources` block to `rune.config.yml`, point it at your existing tables, and Rune's BFS traversal reads from both sources transparently — no data duplication, no sync code.
 
 ---
 
@@ -188,7 +188,7 @@ Step 3 (ABAC):  time 23:00 is outside 09:00-17:00  → ❌ DENY
 Final: DENY (reason: "outside office hours")
 ```
 
-**What exists today:** ReBAC layer is fully built with custom actions/relations support. RBAC inheritance and ABAC conditions are on the roadmap.
+**What exists today:** All three layers are fully built. Set `mode: rbac`, `mode: abac`, `mode: rebac`, or `mode: hybrid` per resource in `rune.config.yml`. ABAC conditions support `time_between`, `ip_in`, and `resource`/`subject` attribute checks.
 
 ---
 
@@ -290,7 +290,7 @@ Acme Corp:             TechStart Inc:
 
 This is the feature Permit.io charges **$500+/month** for. With Rune, it's included and self-hosted.
 
-**What exists today:** Multi-tenancy exists in the database schema (every query is scoped by `tenant_id`). Tenant onboarding API and admin portal are on the roadmap.
+**What exists today:** Multi-tenant isolation is fully implemented (every query scoped by `tenant_id`, zero cross-tenant leakage). Tenant onboarding API (`POST /v1/tenants`) and per-tenant admin portal are on the roadmap.
 
 ---
 
@@ -298,23 +298,23 @@ This is the feature Permit.io charges **$500+/month** for. With Rune, it's inclu
 
 | # | Problem | Rune's Solution | Status |
 |---|---|---|---|
-| 1 | 3+ weeks to integrate | CLI scaffolder + middleware + config-driven model | 🟡 Partial (SDK done, CLI coming) |
-| 2 | No UI for non-devs | Admin Dashboard embedded in engine | 🔴 Roadmap |
-| 3 | Data sync nightmares | Zero-Sync — reads your existing DB tables | 🔴 Roadmap |
+| 1 | 3+ weeks to integrate | CLI (`rune init`, `rune validate`, `rune explain`) + SDK middleware | ✅ Solved |
+| 2 | No UI for non-devs | Admin Dashboard embedded in engine — login, logs, directory, playground | ✅ Solved |
+| 3 | Data sync nightmares | Zero-Sync — `SqlDataSource` reads your existing DB tables via config mappings | ✅ Solved |
 | 4 | Unpredictable pricing | Self-hosted, you own the infra | ✅ Solved |
-| 5 | No RBAC + ReBAC + ABAC | 3-layer pipeline: ReBAC → RBAC → ABAC | 🟡 ReBAC done, RBAC+ABAC coming |
-| 6 | No zero-sync | Config-driven table mapping | 🔴 Roadmap |
-| 7 | No non-dev UI | Same as #2 | 🔴 Roadmap |
+| 5 | No RBAC + ReBAC + ABAC | 3-layer pipeline: ReBAC (BFS) → RBAC (one-hop) → ABAC (conditions) | ✅ Solved |
+| 6 | No zero-sync | `datasources` block in `rune.config.yml` maps your tables to tuples | ✅ Solved |
+| 7 | No non-dev UI | Same as #2 | ✅ Solved |
 | 8 | Expensive at scale | Same as #4 | ✅ Solved |
-| 9 | No multi-tenant starter | Tenant API + per-tenant config + admin portal | 🟡 Partial (isolation done, APIs coming) |
+| 9 | No multi-tenant starter | Multi-tenant isolation done; tenant onboarding API + per-tenant portal coming | 🟡 Partial |
 
 ---
 
 ## Roadmap
 
-| Phase | What | Timeline |
+| Phase | What | Status |
 |---|---|---|
-| **Phase 1** ✅ | Core engine + SDK + custom actions + resilience | Done |
-| **Phase 2** | Admin Dashboard + RBAC inheritance + CLI | Next |
-| **Phase 3** | Zero-Sync adapter + ABAC conditions | After Phase 2 |
-| **Phase 4** | Multi-Tenant B2B starter + Admin Portal | After Phase 3 |
+| **Phase 1** | Core engine + SDK + custom actions + resilience | ✅ Done |
+| **Phase 2** | Admin Dashboard + RBAC + ABAC + CLI + Zero-Sync | ✅ Done |
+| **Phase 3** | `npx create-rune` scaffolder + Tenant Onboarding API (`POST /v1/tenants`) + per-tenant admin portal | 🔵 Next |
+| **Phase 4** | Managed Cloud tier + Python/Go SDKs + SOC 2 compliance | 🔴 Future |
