@@ -20,11 +20,13 @@ Rune traces the graph — user → group → zone → resource — and returns A
 
 | | |
 |---|---|
-| 🔀 **Graph traversal** | Permissions flow through relationships — BFS finds the path |
-| ⚡ **< 5ms decisions** | LRU cache + permission index means most checks never hit the DB |
+| 🔀 **ReBAC + RBAC + ABAC** | All three models in one engine — set `mode` per resource in `rune.config.yml` |
+| ⚡ **< 5ms decisions** | LRU cache + O(1) permission index — most checks never hit the DB |
 | 🔍 **Full explainability** | Every decision includes a trace, reason, and suggested fix |
 | 🔒 **Fail-closed** | Errors return DENY, never ALLOW. Keys are SHA-256 hashed. |
 | 🏢 **Multi-tenant** | Every query is scoped to `tenant_id` — zero cross-tenant leakage |
+| 🔗 **Zero-Sync** | Read from your existing Postgres/MySQL tables — no separate tuple store needed |
+| 🖥️ **Admin Dashboard** | Built-in UI — manage relationships, view decision logs, test permissions live |
 | 📦 **Zero-dep SDK** | Native `fetch` only — built-in circuit breaker & retry |
 
 ---
@@ -87,7 +89,7 @@ user:arjun  ──member──▸  group:chennai_mgrs  ──owner──▸  zon
                                                                                     ✅ ALLOW
 ```
 
-Rune uses **Relationship-Based Access Control (ReBAC)**. You define *who has what relationship to what*, and Rune traces the graph via BFS to resolve access.
+Rune supports **ReBAC, RBAC, ABAC, and Hybrid** — set `mode` per resource in `rune.config.yml`. For ReBAC resources, Rune traces the graph via BFS to resolve access.
 
 | Relation | read | edit | delete | manage |
 |---|:---:|:---:|:---:|:---:|
@@ -126,15 +128,23 @@ rune/
 │   │       ├── bfs/           # BFS graph traversal
 │   │       ├── cache/         # LRU cache with O(k) invalidation
 │   │       ├── config/        # Env validation (Zod)
-│   │       ├── db/            # Postgres pool + schema + migrations
+│   │       ├── db/            # Postgres pool + migrations
 │   │       ├── engine/        # can() decision function + explainability
 │   │       ├── middleware/    # Auth, admin-only, rate-limit
 │   │       ├── routes/        # /can, /tuples, /health, /logs, /admin
-│   │       └── dashboard/     # Built-in admin UI
+│   │       └── dashboard/     # Built-in admin UI (HTML/CSS/JS)
 │   ├── core/            # @runeauth/core — embeddable engine (no server needed)
-│   └── sdk/             # @runeauth/sdk — zero-dep HTTP client
+│   │   └── src/
+│   │       ├── engine.ts      # RuneEngine — mode routing (rebac/rbac/abac/hybrid)
+│   │       ├── bfs.ts         # Portable BFS traversal
+│   │       ├── conditions.ts  # ABAC condition evaluator
+│   │       ├── policy.ts      # Role inheritance resolver
+│   │       ├── datasource/    # Zero-Sync SQL adapter (Postgres/MySQL/SQLite)
+│   │       └── store/         # TupleStore interface + MemoryStore
+│   ├── sdk/             # @runeauth/sdk — zero-dep HTTP client
+│   └── cli/             # rune init / validate / explain / index tools
 ├── docs/                # All documentation
-├── site/                # Landing page (GitHub Pages)
+├── rune.config.yml      # Authorization policy (modes, roles, conditions, datasources)
 ├── docker-compose.yml   # Local Postgres
 └── .env.example         # Copy to .env to get started
 ```
