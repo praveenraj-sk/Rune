@@ -13,6 +13,7 @@
 import { FastifyInstance } from 'fastify'
 import { resolve } from 'path'
 import { pool } from '../db/client.js'
+import { config } from '../config/index.js'
 import { generateApiKey, hashKey, generateTenantId } from '../db/setup.js'
 export async function setupRoute(fastify: FastifyInstance): Promise<void> {
 
@@ -86,11 +87,11 @@ export async function setupRoute(fastify: FastifyInstance): Promise<void> {
             await runMigrations()
 
             // Step 1: Run migrations (idempotent)
-            const runner = (await import('node-pg-migrate') as any).default || await import('node-pg-migrate')
+            const { runner } = await import('node-pg-migrate')
             const migrationDir = resolve(process.cwd(), 'migrations')
 
             await runner({
-                dbClient: pool,
+                databaseUrl: config.db.url,
                 dir: migrationDir,
                 direction: 'up',
                 migrationsTable: 'pgmigrations',
