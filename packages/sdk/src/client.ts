@@ -70,6 +70,17 @@ export class RuneClient {
     private readonly retryBaseDelay: number
     private readonly retryMaxDelay: number
 
+    /**
+     * Auto-SCT: tracks the highest LVN seen from writes (allow/revoke).
+     * When check() is called without an explicit SCT, the client auto-passes
+     * this LVN so the server bypasses stale cache entries.
+     *
+     * Without this: you call allow(), then check() — and get a stale DENY
+     * from the server cache because the client didn't pass the new LVN.
+     * With this: check() auto-includes the LVN from the most recent write.
+     */
+    private _latestLvn = 0
+
     constructor(private readonly config: RuneOptions) {
         if (!config.apiKey) throw new Error('[Rune] apiKey is required')
         if (!config.baseUrl) throw new Error('[Rune] baseUrl is required')
@@ -137,10 +148,12 @@ export class RuneClient {
         return Math.round(delay + jitter)
     }
 
-    /** Should this error be retried? (network errors & 5xx, not 4xx) */
+    /** Should this error be retried? (network errors, 5xx, and 429) */
     private isRetryable(error: unknown): boolean {
         if (error instanceof RuneError) {
-            // Don't retry client errors (400, 401, 403, 404, 422)
+            // Retry 429 (rate limited) — server is healthy but we're sending too fast
+            if (error.statusCode === 429) return true
+            // Don't retry other client errors (400, 401, 403, 404, 422)
             // Do retry server errors (500, 502, 503, 504)
             return error.statusCode >= 500
         }
@@ -252,7 +265,9 @@ export class RuneClient {
             }
         }
 
-        const result = await this.request<Permission>('POST', '/v1/can', params)
+        // Auto-SCT: if caller didn't pass an explicit SCT, use the latest LVN from writes
+        const sct = params.sct ?? (this._latestLvn > 0 ? { lvn: this._latestLvn } : undefined)
+        const result = await this.request<Permission>('POST', '/v1/can', { ...params, sct })
 
         // Store in local cache based on strategy
         if (this.localCache && result.status !== 'NOT_FOUND') {
@@ -277,6 +292,10 @@ export class RuneClient {
     /** Add a relationship — grant someone access */
     async allow(grant: Grant): Promise<GrantResult> {
         const result = await this.request<GrantResult>('POST', '/v1/tuples', grant)
+        // Track the LVN from this write for auto-SCT
+        if (result.lvn !== undefined && result.lvn > this._latestLvn) {
+            this._latestLvn = result.lvn
+        }
         // Invalidate local cache — permissions may have changed
         this.localCache?.clear()
         return result
@@ -285,6 +304,10 @@ export class RuneClient {
     /** Remove a relationship — revoke someone's access */
     async revoke(grant: Grant): Promise<GrantResult> {
         const result = await this.request<GrantResult>('DELETE', '/v1/tuples', grant)
+        // Track the LVN from this write for auto-SCT
+        if (result.lvn !== undefined && result.lvn > this._latestLvn) {
+            this._latestLvn = result.lvn
+        }
         // Invalidate local cache — permissions may have changed
         this.localCache?.clear()
         return result

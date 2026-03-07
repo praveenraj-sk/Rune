@@ -19,13 +19,14 @@
  *   edit   → [editor, admin]
  *   delete → [admin]
  */
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, watchFile, unwatchFile } from 'fs'
 import { join } from 'path'
 import yaml from 'js-yaml'
 import { logger } from '../logger/index.js'
 import type { RuneConfig, ResolvedPolicy, ResolvedResource, ResolvedRole } from './types.js'
 
 let resolvedPolicy: ResolvedPolicy | null = null
+let watchedPath: string | null = null
 
 /**
  * Load and resolve the policy from rune.config.yml.
@@ -45,6 +46,10 @@ export function loadPolicy(configPath?: string): ResolvedPolicy {
         validate(parsed)
         resolvedPolicy = resolve(parsed)
         logger.info({ path, resources: Object.keys(resolvedPolicy.resources) }, 'policy_loaded')
+
+        // Start watching for changes (hot-reload)
+        watchPolicy(path)
+
         return resolvedPolicy
     } catch (error) {
         logger.error({ error: (error as Error).message, path }, 'policy_load_failed')
@@ -60,6 +65,64 @@ export function getPolicy(): ResolvedPolicy {
         resolvedPolicy = getDefaultPolicy()
     }
     return resolvedPolicy
+}
+
+// ── Hot Reload ──────────────────────────────────────────────
+// Watches rune.config.yml for changes and re-resolves the policy in-place.
+// Uses fs.watchFile (polling) because fs.watch is unreliable on some platforms
+// (Docker volumes, NFS, WSL). Polls every 2s — lightweight for a single file.
+//
+// On reload failure: logs error but keeps the PREVIOUS valid policy running.
+// This prevents a syntax error in YAML from crashing production.
+
+const POLL_INTERVAL_MS = 2_000
+
+/**
+ * Start watching the policy config file for changes.
+ * Called automatically after loadPolicy() finds a valid config.
+ * Safe to call multiple times — only one watcher is active at a time.
+ */
+export function watchPolicy(configPath: string): void {
+    // Stop any existing watcher
+    stopWatchingPolicy()
+
+    watchedPath = configPath
+    watchFile(configPath, { interval: POLL_INTERVAL_MS }, (curr, prev) => {
+        // Only reload if file was actually modified (mtime changed)
+        if (curr.mtimeMs === prev.mtimeMs) return
+
+        logger.info({ path: configPath }, 'policy_file_changed — reloading')
+        try {
+            const raw = readFileSync(configPath, 'utf-8')
+            const parsed = yaml.load(raw) as RuneConfig
+            validate(parsed)
+            resolvedPolicy = resolve(parsed)
+            logger.info(
+                { path: configPath, resources: Object.keys(resolvedPolicy.resources) },
+                'policy_hot_reloaded',
+            )
+        } catch (error) {
+            // Keep the old valid policy running — never crash on reload failure
+            logger.error(
+                { error: (error as Error).message, path: configPath },
+                'policy_hot_reload_failed — keeping previous policy',
+            )
+        }
+    })
+
+    logger.info({ path: configPath, poll_ms: POLL_INTERVAL_MS }, 'policy_watcher_started')
+}
+
+/**
+ * Stop watching the policy config file.
+ * Called during graceful shutdown or before starting a new watcher.
+ */
+export function stopWatchingPolicy(): void {
+    if (watchedPath) {
+        unwatchFile(watchedPath)
+        logger.debug({ path: watchedPath }, 'policy_watcher_stopped')
+        watchedPath = null
+    }
 }
 
 /**

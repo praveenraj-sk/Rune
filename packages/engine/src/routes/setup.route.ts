@@ -11,27 +11,10 @@
  *     -d '{"tenantName": "my-app"}'
  */
 import { FastifyInstance } from 'fastify'
-import { createHash, randomBytes } from 'crypto'
-import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { pool } from '../db/client.js'
-
-function generateApiKey(): string {
-    return `rune_${randomBytes(24).toString('base64url')}`
-}
-
-function hashKey(key: string): string {
-    return createHash('sha256').update(key).digest('hex')
-}
-
-function generateTenantId(): string {
-    const b = randomBytes(16)
-    b[6] = (b[6]! & 0x0f) | 0x40
-    b[8] = (b[8]! & 0x3f) | 0x80
-    const hex = b.toString('hex')
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
-}
-
+import { config } from '../config/index.js'
+import { generateApiKey, hashKey, generateTenantId } from '../db/setup.js'
 export async function setupRoute(fastify: FastifyInstance): Promise<void> {
 
     // Shared migration logic — drops old constraints that block custom actions/relations
@@ -103,18 +86,17 @@ export async function setupRoute(fastify: FastifyInstance): Promise<void> {
             // Step 0: Run migrations (drop old constraints)
             await runMigrations()
 
-            // Step 1: Run schema (idempotent)
-            const schemaPath = resolve(process.cwd(), 'src/db/schema.sql')
-            let schema: string
-            try {
-                schema = readFileSync(schemaPath, 'utf8')
-            } catch {
-                // In Docker, dist is at /app/packages/engine/dist, but src is also copied
-                // Try relative to __dirname
-                const altPath = resolve(new URL('.', import.meta.url).pathname, '../../src/db/schema.sql')
-                schema = readFileSync(altPath, 'utf8')
-            }
-            await pool.query(schema)
+            // Step 1: Run migrations (idempotent)
+            const { runner } = await import('node-pg-migrate')
+            const migrationDir = resolve(process.cwd(), 'migrations')
+
+            await runner({
+                databaseUrl: config.db.url,
+                dir: migrationDir,
+                direction: 'up',
+                migrationsTable: 'pgmigrations',
+                log: () => { }, // hide logs in HTTP response
+            })
 
             // Step 2: Create tenant + API key
             const tenantId = generateTenantId()

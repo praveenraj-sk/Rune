@@ -14,19 +14,7 @@
 import { describe, test, expect } from 'vitest'
 import { RuneEngine, MemoryStore } from '../src/index.js'
 import type { RuneConfig } from '../src/index.js'
-
-const config: RuneConfig = {
-    version: 1,
-    resources: {
-        doc: {
-            mode: 'rebac',
-            roles: {
-                owner: { actions: ['read', 'edit', 'delete', 'manage'] },
-                viewer: { actions: ['read'] },
-            },
-        },
-    },
-}
+import { testConfig as config } from './test-utils.js'
 
 function percentile(values: number[], p: number): number {
     const sorted = [...values].sort((a, b) => a - b)

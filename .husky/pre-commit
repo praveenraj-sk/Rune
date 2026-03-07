@@ -1,0 +1,5 @@
+# Pre-commit: typecheck + test before every commit
+# Prevents broken code from entering the repo.
+# Skip with: git commit --no-verify (emergencies only)
+
+pnpm typecheck && pnpm test:all

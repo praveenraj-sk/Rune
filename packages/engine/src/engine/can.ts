@@ -32,20 +32,28 @@ import { checkIndex } from '../db/permission-index.js'
 import { buildTrace, buildReason, buildSuggestedFix } from './explain.js'
 import { getLocalLvn } from './lvn.js'
 import { logger } from '../logger/index.js'
+import { metrics } from '../metrics/collector.js'
 import { makeDenyResult, type CanInput, type CanResult } from './types.js'
 
 export async function can(input: CanInput): Promise<CanResult> {
     const start = performance.now()
 
     try {
-        // Step 1: Validate inputs (fail closed on missing fields)
-        if (!input.subject) return { ...makeDenyResult('invalid_subject'), latency_ms: performance.now() - start }
-        if (!input.action) return { ...makeDenyResult('invalid_action'), latency_ms: performance.now() - start }
-        if (!input.object) return { ...makeDenyResult('invalid_object'), latency_ms: performance.now() - start }
-        if (!input.tenantId) return { ...makeDenyResult('invalid_tenant_id'), latency_ms: performance.now() - start }
+        // Step 1: Trim + validate inputs (fail closed on missing/empty fields)
+        // Trim prevents "  user:admin  " from failing to match "user:admin" in tuples.
+        // Explicit .trim().length check is safer than JS truthiness (which passes "" but not undefined).
+        const subject  = input.subject?.trim()
+        const action   = input.action?.trim()
+        const object   = input.object?.trim()
+        const tenantId = input.tenantId?.trim()
 
-        // Step 2: Build cache key
-        const cacheKey = cache.buildKey(input.tenantId, input.subject, input.object, input.action)
+        if (!subject || subject.length === 0)  return { ...makeDenyResult('invalid_subject'), latency_ms: performance.now() - start }
+        if (!action || action.length === 0)    return { ...makeDenyResult('invalid_action'), latency_ms: performance.now() - start }
+        if (!object || object.length === 0)    return { ...makeDenyResult('invalid_object'), latency_ms: performance.now() - start }
+        if (!tenantId || tenantId.length === 0) return { ...makeDenyResult('invalid_tenant_id'), latency_ms: performance.now() - start }
+
+        // Step 2: Build cache key (uses trimmed values from here on)
+        const cacheKey = cache.buildKey(tenantId, subject, object, action)
 
         // Step 3 + 4: SCT freshness check and cache lookup
         const reqLvn = input.sct?.lvn ?? 0
@@ -70,13 +78,15 @@ export async function can(input: CanInput): Promise<CanResult> {
                     latency_ms: performance.now() - start,
                     sct: { lvn },
                 }
-                logDecision(input, result)
+                metrics.record({ decision: cached.decision, cache_hit: true, index_hit: false, latency_ms: result.latency_ms })
+                const trimmedInput: CanInput = { subject, action, object, tenantId, ...(input.sct ? { sct: input.sct } : {}), ...(input.context ? { context: input.context } : {}) }
+                logDecision(trimmedInput, result)
                 return result
             }
         }
 
         // Step 5: Permission index — O(1) Postgres lookup before BFS
-        const indexHit = await checkIndex(input.tenantId, input.subject, input.action, input.object)
+        const indexHit = await checkIndex(tenantId, subject, action, object)
         if (indexHit) {
             // Priority 1 fix: getLocalLvn() — no DB round-trip
             const lvn = getLocalLvn()
@@ -92,13 +102,15 @@ export async function can(input: CanInput): Promise<CanResult> {
                 sct: { lvn },
             }
             // Priority 2 fix: pass meta so cache can build subject/object indices
-            cache.set(cacheKey, { decision: 'allow', lvn }, { subject: input.subject, object: input.object })
-            logDecision(input, result)
+            cache.set(cacheKey, { decision: 'allow', lvn }, { subject, object })
+            metrics.record({ decision: 'allow', cache_hit: false, index_hit: true, latency_ms: result.latency_ms })
+            const trimmedInput: CanInput = { subject, action, object, tenantId, ...(input.sct ? { sct: input.sct } : {}), ...(input.context ? { context: input.context } : {}) }
+            logDecision(trimmedInput, result)
             return result
         }
 
         // Step 6: BFS traversal
-        const traversal = await traverse(input.tenantId, input.subject, input.object, input.action)
+        const traversal = await traverse(tenantId, subject, object, action)
 
         // Step 7: NOT_FOUND — object doesn't exist in tuple store (don't cache)
         if (!traversal.objectExists) {
@@ -106,7 +118,7 @@ export async function can(input: CanInput): Promise<CanResult> {
             return {
                 decision: 'deny',
                 status: 'NOT_FOUND',
-                reason: buildReason({ ...traversal, subject: input.subject, object: input.object, action: input.action }),
+                reason: buildReason({ ...traversal, subject, object, action }),
                 trace: [],
                 suggested_fix: [],
                 cache_hit: false,
@@ -122,7 +134,7 @@ export async function can(input: CanInput): Promise<CanResult> {
             return {
                 decision: 'deny',
                 status: 'DENY',
-                reason: buildReason({ ...traversal, subject: input.subject, object: input.object, action: input.action }),
+                reason: buildReason({ ...traversal, subject, object, action }),
                 trace: buildTrace(traversal.path, false),
                 suggested_fix: [],
                 cache_hit: false,
@@ -136,13 +148,13 @@ export async function can(input: CanInput): Promise<CanResult> {
         const decision = traversal.found ? 'allow' : 'deny'
         const status = traversal.found ? 'ALLOW' : 'DENY'
         const trace = buildTrace(traversal.path, traversal.found)
-        const reason = buildReason({ ...traversal, subject: input.subject, object: input.object, action: input.action })
+        const reason = buildReason({ ...traversal, subject, object, action })
 
         // Priority 3 fix: compute suggestedFix for DENY — then cache it so
         // repeated DENY requests don't hit the DB again
         const suggestedFix = traversal.found
             ? []
-            : await buildSuggestedFix(input.tenantId, input.subject, input.object, input.action)
+            : await buildSuggestedFix(tenantId, subject, object, action)
 
         // Step 10: Get current LVN — from memory, zero DB cost (Priority 1 fix)
         const lvn = getLocalLvn()
@@ -157,7 +169,7 @@ export async function can(input: CanInput): Promise<CanResult> {
         const cacheValue: import('../cache/lru.js').CachedDecision = decision === 'deny'
             ? { decision: 'deny', lvn, suggestedFix }
             : { decision: 'allow', lvn }
-        cache.set(cacheKey, cacheValue, { subject: input.subject, object: input.object })
+        cache.set(cacheKey, cacheValue, { subject, object })
 
         // Step 12 + 13: Build result, log (fire and forget), return
         const result: CanResult = {
@@ -176,22 +188,36 @@ export async function can(input: CanInput): Promise<CanResult> {
         const SLOW_THRESHOLD_MS = 20
         if (result.latency_ms > SLOW_THRESHOLD_MS) {
             logger.warn({
-                subject: input.subject,
-                action: input.action,
-                object: input.object,
-                tenantId: input.tenantId,
+                subject,
+                action,
+                object,
+                tenantId,
                 latency_ms: result.latency_ms.toFixed(2),
                 bfs_depth: traversal.depthReached,
                 bfs_nodes: traversal.nodeCount,
             }, 'slow_authorization_decision')
         }
 
-        logDecision(input, result)
+        // Record metrics (cache_hit=false, index_hit=false since we did BFS)
+        metrics.record({
+            decision,
+            cache_hit: false,
+            index_hit: false,
+            latency_ms: result.latency_ms,
+            bfs_depth: traversal.depthReached,
+        })
+
+        // Use trimmed values for the decision log
+        const trimmedInput: CanInput = { subject, action, object, tenantId, ...(input.sct ? { sct: input.sct } : {}), ...(input.context ? { context: input.context } : {}) }
+        logDecision(trimmedInput, result)
         return result
 
     } catch (error) {
         // FAIL CLOSED: any unexpected error returns DENY — never allows
-        logger.error({ error: (error as Error).message, subject: input.subject, object: input.object }, 'can_function_error')
+        metrics.recordError()
+        const errSubject = input.subject?.trim() ?? ''
+        const errObject  = input.object?.trim() ?? ''
+        logger.error({ error: (error as Error).message, subject: errSubject, object: errObject }, 'can_function_error')
         return { ...makeDenyResult('service_error'), latency_ms: performance.now() - start }
     }
 }

@@ -11,26 +11,7 @@
 import { describe, test, expect, vi } from 'vitest'
 import { RuneEngine, MemoryStore } from '../src/index.js'
 import type { TupleStore, Tuple } from '../src/index.js'
-import type { RuneConfig } from '../src/index.js'
-
-const config: RuneConfig = {
-    version: 1,
-    resources: {
-        doc: {
-            mode: 'rebac',
-            roles: {
-                owner: { actions: ['read', 'edit', 'delete', 'manage'] },
-                viewer: { actions: ['read'] },
-            },
-        },
-        zone: {
-            mode: 'rebac',
-            roles: {
-                member: { actions: ['read'] },
-            },
-        },
-    },
-}
+import { testConfig as config } from './test-utils.js'
 
 function makeEngine(opts?: { maxDepth?: number; maxNodes?: number }) {
     return new RuneEngine({

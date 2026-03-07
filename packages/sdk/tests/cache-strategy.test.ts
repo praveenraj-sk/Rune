@@ -54,32 +54,30 @@ beforeEach(() => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkCacheBehavior(client: ReturnType<typeof makeClient>, type: 'allow' | 'deny', expectHit: boolean, expectedFetchCount: number) {
+    const r1 = await client.check(CHECK_PARAMS)
+    const r2 = await client.check(CHECK_PARAMS)
+
+    expect(r1.decision).toBe(type)
+    expect(r2.decision).toBe(type)
+    expect(r2.cache_hit).toBe(expectHit)
+    expect(mockFetch).toHaveBeenCalledTimes(expectedFetchCount)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // allow_and_deny (default)
 // ─────────────────────────────────────────────────────────────────────────────
 describe('CacheStrategy: allow_and_deny', () => {
     test('caches ALLOW — second call does not hit server', async () => {
         mockFetch.mockResolvedValue(allowResponse())
-        const client = makeClient('allow_and_deny')
-
-        const r1 = await client.check(CHECK_PARAMS)
-        const r2 = await client.check(CHECK_PARAMS)
-
-        expect(r1.decision).toBe('allow')
-        expect(r2.decision).toBe('allow')
-        expect(r2.cache_hit).toBe(true)
-        expect(mockFetch).toHaveBeenCalledTimes(1) // only 1 server call
+        await checkCacheBehavior(makeClient('allow_and_deny'), 'allow', true, 1)
     })
 
     test('caches DENY — second call does not hit server', async () => {
         mockFetch.mockResolvedValue(denyResponse())
-        const client = makeClient('allow_and_deny')
-
-        const r1 = await client.check(CHECK_PARAMS)
-        const r2 = await client.check(CHECK_PARAMS)
-
-        expect(r1.decision).toBe('deny')
-        expect(r2.cache_hit).toBe(true)
-        expect(mockFetch).toHaveBeenCalledTimes(1)
+        await checkCacheBehavior(makeClient('allow_and_deny'), 'deny', true, 1)
     })
 
     test('cache is cleared after revoke()', async () => {
@@ -120,14 +118,7 @@ describe('CacheStrategy: deny_only', () => {
 
     test('DOES cache DENY — second DENY does not hit server', async () => {
         mockFetch.mockResolvedValue(denyResponse())
-        const client = makeClient('deny_only')
-
-        const r1 = await client.check(CHECK_PARAMS)
-        const r2 = await client.check(CHECK_PARAMS)
-
-        expect(r1.decision).toBe('deny')
-        expect(r2.cache_hit).toBe(true)
-        expect(mockFetch).toHaveBeenCalledTimes(1)
+        await checkCacheBehavior(makeClient('deny_only'), 'deny', true, 1)
     })
 
     test('access revocation is seen immediately — no stale ALLOW window', async () => {

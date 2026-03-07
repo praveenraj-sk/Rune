@@ -11,11 +11,6 @@ export type TraversalResult = {
     limitHit: 'depth' | 'nodes' | null
 }
 
-export type QueueItem = {
-    node: string
-    depth: number
-}
-
 /**
  * Get the valid relations that grant a given action.
  *

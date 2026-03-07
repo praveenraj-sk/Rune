@@ -1,13 +1,7 @@
 /**
  * rune validate — validate rune.config.yml
  */
-import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
-import yaml from 'js-yaml'
-
-type RoleConfig = { actions?: string[]; inherits?: string[] }
-type ResourceConfig = { roles?: Record<string, RoleConfig> }
-type Config = { version?: number; resources?: Record<string, ResourceConfig> }
+import { Config, findConfig, loadConfig, resolveActions, RoleConfig, ResourceConfig } from './utils.js'
 
 export async function validate(): Promise<void> {
     const configPath = findConfig()
@@ -19,11 +13,10 @@ export async function validate(): Promise<void> {
 
     console.log(`\n  Validating ${configPath}...\n`)
 
-    const raw = readFileSync(configPath, 'utf-8')
     let config: Config
 
     try {
-        config = yaml.load(raw) as Config
+        config = loadConfig(configPath)
     } catch (e) {
         console.log(`  ✗ Invalid YAML: ${(e as Error).message}\n`)
         process.exit(1)
@@ -41,7 +34,8 @@ export async function validate(): Promise<void> {
     if (!config.resources || typeof config.resources !== 'object') {
         errors.push('Missing resources section')
     } else {
-        for (const [resName, res] of Object.entries(config.resources)) {
+        for (const [resName, resRaw] of Object.entries(config.resources)) {
+            const res = resRaw as ResourceConfig
             if (!res.roles || typeof res.roles !== 'object') {
                 errors.push(`Resource "${resName}": missing roles`)
                 continue
@@ -49,7 +43,8 @@ export async function validate(): Promise<void> {
 
             const roleNames = Object.keys(res.roles)
 
-            for (const [roleName, role] of Object.entries(res.roles)) {
+            for (const [roleName, roleRaw] of Object.entries(res.roles)) {
+                const role = roleRaw as RoleConfig
                 // Actions check
                 if (!Array.isArray(role.actions) || role.actions.length === 0) {
                     errors.push(`Role "${roleName}" in "${resName}": must have at least one action`)
@@ -88,13 +83,15 @@ export async function validate(): Promise<void> {
     // Print resolved roles
     if (errors.length === 0 && config.resources) {
         console.log('  Resolved roles:\n')
-        for (const [resName, res] of Object.entries(config.resources)) {
+        for (const [resName, resRaw] of Object.entries(config.resources)) {
+            const res = resRaw as ResourceConfig
             console.log(`  ${resName}:`)
             if (!res.roles) continue
-            for (const [roleName, role] of Object.entries(res.roles)) {
+            for (const [roleName, roleRaw] of Object.entries(res.roles)) {
+                const role = roleRaw as RoleConfig
                 const resolved = resolveActions(roleName, res.roles as Record<string, RoleConfig>, new Set())
                 const own = role.actions?.join(', ') ?? ''
-                const inherited = resolved.filter(a => !role.actions?.includes(a))
+                const inherited = resolved.filter((a: string) => !role.actions?.includes(a))
                 let line = `    ${roleName}: [${own}]`
                 if (inherited.length > 0) {
                     line += ` + inherited: [${inherited.join(', ')}]`
@@ -135,25 +132,3 @@ function checkCircular(role: string, roles: Record<string, RoleConfig>, visited:
     return null
 }
 
-function resolveActions(role: string, roles: Record<string, RoleConfig>, visited: Set<string>): string[] {
-    if (visited.has(role)) return []
-    visited.add(role)
-    const def = roles[role]
-    if (!def) return []
-    const actions = new Set(def.actions ?? [])
-    if (def.inherits) {
-        for (const parent of def.inherits) {
-            for (const a of resolveActions(parent, roles, visited)) actions.add(a)
-        }
-    }
-    return [...actions]
-}
-
-function findConfig(): string | null {
-    const candidates = ['rune.config.yml', 'rune.config.yaml']
-    for (const c of candidates) {
-        const p = join(process.cwd(), c)
-        if (existsSync(p)) return p
-    }
-    return null
-}
