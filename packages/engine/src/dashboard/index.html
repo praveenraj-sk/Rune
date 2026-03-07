@@ -95,6 +95,13 @@
                     </svg>
                     Playground
                 </a>
+                <a href="#" class="nav-btn" data-tab="access">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    Access Explorer
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -253,6 +260,60 @@
                             </svg>
                             <p>Run a test to see the BFS trace.</p>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: ACCESS EXPLORER -->
+            <section id="tab-access" class="tab-content hidden">
+                <header class="page-header">
+                    <div>
+                        <h1>Access Explorer</h1>
+                        <p class="subtitle">Explore who can access what, using the materialised permission index.</p>
+                    </div>
+                </header>
+
+                <!-- What can subject X do? -->
+                <div class="card p-6 mb-6">
+                    <h2 class="section-title">What can a subject access?</h2>
+                    <form id="form-accessible" class="inline-form">
+                        <div class="form-group flex-1">
+                            <label>Subject</label>
+                            <input type="text" id="accessible-subject" class="input w-full" placeholder="user:alice">
+                        </div>
+                        <div class="form-group">
+                            <label>Action (optional)</label>
+                            <input type="text" id="accessible-action" class="input" placeholder="read">
+                        </div>
+                        <button type="submit" class="btn btn-primary align-end">Search</button>
+                    </form>
+                    <div id="accessible-results" class="mt-4 hidden">
+                        <table class="data-table">
+                            <thead><tr><th>Action</th><th>Object</th></tr></thead>
+                            <tbody id="accessible-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Who can access object Y? -->
+                <div class="card p-6">
+                    <h2 class="section-title">Who can access an object?</h2>
+                    <form id="form-whocan" class="inline-form">
+                        <div class="form-group flex-1">
+                            <label>Object</label>
+                            <input type="text" id="whocan-object" class="input w-full" placeholder="doc:readme">
+                        </div>
+                        <div class="form-group">
+                            <label>Action (optional)</label>
+                            <input type="text" id="whocan-action" class="input" placeholder="read">
+                        </div>
+                        <button type="submit" class="btn btn-primary align-end">Search</button>
+                    </form>
+                    <div id="whocan-results" class="mt-4 hidden">
+                        <table class="data-table">
+                            <thead><tr><th>Subject</th><th>Action</th></tr></thead>
+                            <tbody id="whocan-tbody"></tbody>
+                        </table>
                     </div>
                 </div>
             </section>

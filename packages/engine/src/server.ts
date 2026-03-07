@@ -29,6 +29,7 @@ import { indexHealthRoute } from './routes/index-health.route.js'
 import { indexRebuildRoute } from './routes/index-rebuild.route.js'
 import { metricsRoute } from './routes/metrics.route.js'
 import { batchRoute } from './routes/batch.route.js'
+import { accessibleRoute } from './routes/accessible.route.js'
 import { errorHandler } from './middleware/error-handler.js'
 import { registerRequestId } from './middleware/request-id.js'
 import { loadPolicy, stopWatchingPolicy } from './policy/config.js'
@@ -56,6 +57,7 @@ fastify.register(indexHealthRoute, { prefix: '/v1' })
 fastify.register(indexRebuildRoute, { prefix: '/v1' })
 fastify.register(metricsRoute, { prefix: '/v1' })
 fastify.register(batchRoute, { prefix: '/v1' })
+fastify.register(accessibleRoute, { prefix: '/v1' })
 
 // Serve static dashboard
 fastify.register(fastifyStatic, {

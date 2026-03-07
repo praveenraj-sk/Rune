@@ -13,6 +13,7 @@ import { createHash } from 'crypto'
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import { query } from '../db/client.js'
 import { logger } from '../logger/index.js'
+import { jwtMiddleware } from './jwt.js'
 
 // Extend FastifyRequest to carry tenantId after auth
 declare module 'fastify' {
@@ -65,4 +66,25 @@ export async function authMiddleware(
         logger.error({ error: (error as Error).message }, 'auth_middleware_db_error')
         await reply.status(401).send({ error: 'auth_error' })
     }
+}
+
+/**
+ * Combined auth middleware — accepts either:
+ *   1. x-api-key header  → API key auth (existing behaviour, unchanged)
+ *   2. Authorization: Bearer <jwt>  → JWT HS256 auth (requires JWT_SECRET env var)
+ *
+ * Used on endpoints where end-user clients may call Rune directly with a
+ * short-lived JWT instead of a long-lived API key.
+ */
+export async function apiKeyOrJwtMiddleware(
+    request: FastifyRequest,
+    reply: FastifyReply,
+): Promise<void> {
+    if (request.headers['x-api-key']) {
+        return authMiddleware(request, reply)
+    }
+    if (request.headers.authorization?.startsWith('Bearer ')) {
+        return jwtMiddleware(request, reply)
+    }
+    await reply.status(401).send({ error: 'missing_credentials' })
 }

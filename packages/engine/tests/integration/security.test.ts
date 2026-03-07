@@ -106,7 +106,9 @@ describe('🛡️ Security Tests', () => {
         expect(body.status).toBe('DENY')
     })
 
-    // ─── Attack 4: Missing API Key ──────────────────────────────────────────────
+    // ─── Attack 4: Missing credentials returns 401 ──────────────────────────────
+    // /v1/can accepts either x-api-key or Authorization: Bearer <jwt>
+    // Sending neither must return 401 with missing_credentials
     test('ATTACK 4 — Missing x-api-key returns 401', async () => {
         const res = await app.inject({
             method: 'POST', url: '/v1/can',
@@ -114,7 +116,7 @@ describe('🛡️ Security Tests', () => {
         })
         expect(res.statusCode).toBe(401)
         const body = res.json<{ error: string }>()
-        expect(body.error).toBe('missing_api_key')
+        expect(body.error).toBe('missing_credentials')
     })
 
     // ─── Attack 5: Invalid API Key ──────────────────────────────────────────────
