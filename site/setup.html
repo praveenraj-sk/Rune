@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Guide — Rune Authorization Engine</title>
+    <meta name="description"
+        content="Complete setup guide for Rune. Deploy to production with Docker in minutes, or run locally for development.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* ═══ Setup page-specific styles ═══ */
+        .setup-hero {
+            padding: 120px 24px 60px;
+            text-align: center;
+            background: linear-gradient(180deg, #FFFFFF 0%, var(--bg-main) 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .setup-hero h1 {
+            font-size: clamp(1.9rem, 4vw, 2.75rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: var(--primary);
+            margin-bottom: 14px;
+        }
+
+        .setup-hero p {
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 480px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* ═══ Tab switcher ═══ */
+        .tab-bar {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 40px 24px 0;
+            background: var(--bg-main);
+        }
+
+        .tab-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 20px;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: var(--font);
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-white);
+            color: var(--text-muted);
+            transition: all 0.15s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            border-color: var(--border-hover);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .tab-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 100px;
+            background: rgba(255, 255, 255, 0.2);
+            letter-spacing: 0.04em;
+        }
+
+        .tab-btn:not(.active) .tab-badge {
+            background: #F4F4F5;
+            color: var(--text-dimmer);
+        }
+
+        /* ═══ Setup content area ═══ */
+        .setup-content {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        /* ═══ Section title inside a panel ═══ */
+        .panel-header {
+            margin-bottom: 36px;
+        }
+
+        .panel-header h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .panel-header p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* ═══ Prerequisites ═══ */
+        .prereqs {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 36px;
+            box-shadow: var(--shadow);
+        }
+
+        .prereqs h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dimmer);
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+
+        .prereq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            list-style: none;
+        }
+
+        .prereq-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.875rem;
+            color: var(--text-main);
+        }
+
+        .prereq-list li::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary);
+            margin-top: 7px;
+            flex-shrink: 0;
+        }
+
+        .prereq-list code {
+            font-size: 0.78rem;
+        }
+
+        .prereq-list a {
+            color: var(--text-muted);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .prereq-list a:hover {
+            color: var(--text-main);
+        }
+
+        /* ═══ Steps ═══ */
+        .setup-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .setup-step {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            position: relative;
+        }
+
+        .setup-step:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 40px;
+            bottom: -8px;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .step-col-num {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            padding-top: 2px;
+        }
+
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .step-col-body {
+            flex: 1;
+            padding-bottom: 36px;
+        }
+
+        .step-col-body h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 6px;
+            margin-top: 4px;
+        }
+
+        .step-col-body p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.65;
+            margin-bottom: 12px;
+        }
+
+        .step-col-body p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ═══ Code blocks ═══ */
+        .code-block {
+            background: #FAFAFA;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .code-block-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-block-label {
+            font-size: 0.7rem;
+            font-family: var(--mono);
+            color: var(--text-dimmer);
+            font-weight: 500;
+        }
+
+        .code-block-lang {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 100px;
+            background: #F4F4F5;
+            color: var(--text-dimmer);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .code-block pre {
+            padding: 16px 18px;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            line-height: 1.75;
+            overflow-x: auto;
+            color: var(--text-main);
+            margin: 0;
+        }
+
+        .code-block pre .kw { color: #18181B; font-weight: 600; }
+        .code-block pre .str { color: #525252; }
+        .code-block pre .fn { color: #171717; }
+        .code-block pre .var { color: #404040; }
+        .code-block pre .cmt { color: var(--text-dimmer); font-style: italic; }
+        .code-block pre .hl { background: #F0F0F0; border-radius: 3px; padding: 0 3px; }
+
+        /* ═══ Callouts ═══ */
+        .callout {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 14px 16px;
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+
+        .callout-icon {
+            flex-shrink: 0;
+            font-size: 1rem;
+            margin-top: 1px;
+        }
+
+        .callout.warn {
+            background: #FFFBEB;
+            border: 1px solid #FDE68A;
+            color: #78350F;
+        }
+
+        .callout.info {
+            background: #F0F9FF;
+            border: 1px solid #BAE6FD;
+            color: #0C4A6E;
+        }
+
+        .callout.success {
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+            color: #14532D;
+        }
+
+        .callout.danger {
+            background: #FFF1F2;
+            border: 1px solid #FECDD3;
+            color: #881337;
+        }
+
+        .callout strong {
+            font-weight: 600;
+        }
+
+        /* ═══ Env vars table ═══ */
+        .setup-section {
+            margin-top: 60px;
+        }
+
+        .setup-section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dimmer);
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .env-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .env-table th {
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            font-weight: 500;
+            background: #FAFAFA;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .env-table td {
+            padding: 11px 16px;
+            border-bottom: 1px solid #F4F4F5;
+            color: var(--text-main);
+            vertical-align: top;
+        }
+
+        .env-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .env-table td:first-child code {
+            font-size: 0.78rem;
+            font-weight: 500;
+        }
+
+        .env-table td:nth-child(2) {
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 0.78rem;
+        }
+
+        .env-table td:nth-child(3) {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            line-height: 1.55;
+        }
+
+        .required-badge {
+            font-size: 0.6rem;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 100px;
+            background: #FEE2E2;
+            color: #991B1B;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
+        /* ═══ Troubleshooting table ═══ */
+        .trouble-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .trouble-table th {
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            font-weight: 500;
+            background: #FAFAFA;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .trouble-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #F4F4F5;
+            vertical-align: top;
+            line-height: 1.55;
+        }
+
+        .trouble-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .trouble-table td:first-child {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--text-main);
+            font-weight: 500;
+            width: 35%;
+        }
+
+        .trouble-table td:last-child {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* ═══ Security checklist ═══ */
+        .checklist {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            list-style: none;
+        }
+
+        .checklist li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+            padding: 12px 16px;
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .check-icon {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #F4F4F5;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: var(--text-dimmer);
+            margin-top: 1px;
+        }
+
+        .checklist li strong {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        /* ═══ Verify box ═══ */
+        .verify-box {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            margin-top: 10px;
+            box-shadow: var(--shadow);
+        }
+
+        .verify-box h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dimmer);
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        /* ═══ Two-column layout ═══ */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 10px 0;
+        }
+
+        @media (max-width: 640px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+            .tab-btn {
+                font-size: 0.8rem;
+                padding: 8px 14px;
+            }
+        }
+
+        /* ═══ Back link ═══ */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+            transition: color 0.15s;
+        }
+
+        .back-link:hover {
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- ═══ Nav ═══ -->
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg></span> Rune
+            </a>
+            <div class="nav-links">
+                <a href="index.html#features">Features</a>
+                <a href="index.html#how-it-works">How It Works</a>
+                <a href="setup.html" style="color: var(--text-main); font-weight: 600;">Setup Guide</a>
+                <a href="https://github.com/praveenraj-sk/Rune" target="_blank" class="nav-github">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══ Hero ═══ -->
+    <section class="setup-hero">
+        <span class="section-badge">Setup Guide</span>
+        <h1>Get Rune running<br>in minutes.</h1>
+        <p>Two paths: deploy with Docker and never touch source code, or clone and run locally for development.</p>
+    </section>
+
+    <!-- ═══ Tab bar ═══ -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="production" onclick="switchTab('production')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            Option A — Production Deploy
+            <span class="tab-badge">No source code</span>
+        </button>
+        <button class="tab-btn" data-tab="local" onclick="switchTab('local')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Option B — Local Development
+            <span class="tab-badge">Source code</span>
+        </button>
+    </div>
+
+    <!-- ═══ Main content ═══ -->
+    <div class="setup-content">
+
+        <!-- ════════════════════════════════════════
+             OPTION A — PRODUCTION DEPLOY
+        ════════════════════════════════════════ -->
+        <div class="tab-panel active" id="tab-production">
+            <div class="panel-header">
+                <a href="#" class="back-link" onclick="switchTab('production'); return false;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" /><path d="M12 8l-4 4 4 4" /><line x1="16" y1="12" x2="8" y2="12" />
+                    </svg>
+                    Option A — Production Deploy
+                </a>
+                <h2>Deploy Rune to production without touching source code.</h2>
+                <p>Pull the pre-built Docker image, configure environment variables, and start the engine.
+                    Everything — Postgres, migrations, and the API server — runs in containers.</p>
+            </div>
+
+            <!-- Prerequisites -->
+            <div class="prereqs">
+                <h3>Prerequisites</h3>
+                <ul class="prereq-list">
+                    <li><strong>Docker Desktop</strong> (or Docker Engine + Compose v2) — <a href="https://www.docker.com/products/docker-desktop/" target="_blank">docker.com</a></li>
+                    <li><strong>curl</strong> — to download the compose file (pre-installed on macOS/Linux)</li>
+                    <li><strong>A terminal</strong> — bash or zsh</li>
+                    <li>Optional: <strong>psql</strong> if you prefer to connect to Postgres directly — <code>brew install postgresql</code></li>
+                </ul>
+            </div>
+
+            <!-- Steps -->
+            <div class="setup-steps">
+
+                <!-- Step 1 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">1</div></div>
+                    <div class="step-col-body">
+                        <h3>Download the production Compose file</h3>
+                        <p>This file pulls the pre-built engine image from GitHub Container Registry.
+                           No source code clone needed.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>curl -O https://raw.githubusercontent.com/praveenraj-sk/Rune/main/docker-compose.prod.yml</pre>
+                        </div>
+                        <p>This downloads a single <code>docker-compose.prod.yml</code> file to your current directory.
+                           Inspect it before running — it defines two services: <code>postgres</code> and <code>rune-engine</code>.</p>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">2</div></div>
+                    <div class="step-col-body">
+                        <h3>Generate secrets before starting</h3>
+                        <p>Run these two commands once. Store the output in a password manager — you'll need them in the next step.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">generate secrets</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre><span class="cmt"># Salt for hashing API keys (required — never change after issuing keys)</span>
+openssl rand -hex 32
+<span class="cmt"># → e.g. 3f9a2b...  ← copy this as API_KEY_SALT</span>
+
+<span class="cmt"># Admin dashboard key (optional — omit to disable the /dashboard UI)</span>
+openssl rand -hex 32
+<span class="cmt"># → e.g. 8d71cc...  ← copy this as ADMIN_API_KEY</span></pre>
+                        </div>
+                        <div class="callout warn">
+                            <span class="callout-icon">⚠</span>
+                            <span><strong>Do not change <code>API_KEY_SALT</code> after generating your first API key.</strong>
+                            All existing keys are hashed with this salt — changing it invalidates every issued key.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">3</div></div>
+                    <div class="step-col-body">
+                        <h3>Create a <code>.env</code> file</h3>
+                        <p>Create <code>.env</code> in the same directory as your compose file and fill in the values from Step 2.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">.env</span>
+                                <span class="code-block-lang">env</span>
+                            </div>
+                            <pre><span class="cmt"># Required</span>
+DATABASE_URL=postgresql://rune:runepassword@postgres:5432/runedb
+PORT=4078
+NODE_ENV=production
+
+<span class="cmt"># Security — paste values from Step 2</span>
+API_KEY_SALT=<span class="hl">your-32-byte-hex-from-openssl</span>
+ADMIN_API_KEY=<span class="hl">your-32-byte-hex-from-openssl</span>
+
+<span class="cmt"># Tuning (defaults are production-safe)</span>
+MAX_CACHE_SIZE=10000
+MAX_BFS_DEPTH=20
+MAX_BFS_NODES=1000
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=10000</pre>
+                        </div>
+                        <div class="callout info">
+                            <span class="callout-icon">ℹ</span>
+                            <span>The <code>DATABASE_URL</code> uses <code>postgres</code> as the hostname — this is the Docker Compose service name,
+                            so containers resolve it automatically over Docker's internal network.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">4</div></div>
+                    <div class="step-col-body">
+                        <h3>Start the engine</h3>
+                        <p>Docker Compose will pull the Rune image, start Postgres, run the database migrations, and start the API server — all in one command.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>docker compose -f docker-compose.prod.yml up -d</pre>
+                        </div>
+                        <p>The first run downloads the image (~80MB). Subsequent starts are instant.
+                           Both services run in the background (<code>-d</code> flag).</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">check container status</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>docker compose -f docker-compose.prod.yml ps
+<span class="cmt"># Both services should show "Up" or "running"</span>
+
+docker compose -f docker-compose.prod.yml logs rune-engine
+<span class="cmt"># Should show: Rune engine running on port 4078</span></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">5</div></div>
+                    <div class="step-col-body">
+                        <h3>Create your first tenant and API key</h3>
+                        <p>The engine is running but has no tenants yet. Run setup to create your first tenant and receive an API key.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">run setup inside the container</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>docker compose -f docker-compose.prod.yml exec rune-engine pnpm run setup</pre>
+                        </div>
+                        <p>When prompted, enter a name for your tenant (e.g. <code>acme-corp</code>). Setup will output:</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">expected output</span>
+                                <span class="code-block-lang">output</span>
+                            </div>
+                            <pre>  ✓ Setup complete!
+
+  Tenant ID  84d1aef9-3c2b-4f10-a891-...
+  API Key    rune_158Yy...
+
+  ⚠️  Save your API key — it will not be shown again.</pre>
+                        </div>
+                        <div class="callout danger">
+                            <span class="callout-icon">🔑</span>
+                            <span><strong>Save the API key immediately.</strong> It is shown only once. If lost, generate a new one via the admin dashboard or by re-running setup with a new tenant name.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 6 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">6</div></div>
+                    <div class="step-col-body">
+                        <h3>Verify the deployment</h3>
+                        <p>Run these checks to confirm the engine is healthy and accepting authenticated requests.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">health check (no auth required)</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>curl http://localhost:4078/v1/health
+<span class="cmt"># → {"status":"ok","db":"connected"}</span></pre>
+                        </div>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">authenticated permission check</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>curl -s -X POST http://localhost:4078/v1/can \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: <span class="hl">YOUR_API_KEY</span>" \
+  -d '{"subject":"user:test","action":"read","object":"doc:hello"}' | jq .
+
+<span class="cmt"># Expected (no tuples yet — this is correct behaviour):</span>
+<span class="cmt"># {"decision":"deny","status":"NOT_FOUND","reason":"No path found..."}</span></pre>
+                        </div>
+                        <div class="callout success">
+                            <span class="callout-icon">✓</span>
+                            <span>A <code>NOT_FOUND</code> deny is the expected response on a fresh install — it means the engine is running correctly and authenticating your key. NOT_FOUND simply means no relationship tuples have been written yet.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 7 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">7</div></div>
+                    <div class="step-col-body">
+                        <h3>Install the SDK and make your first check</h3>
+                        <p>In your application project, install the SDK and connect to the running engine.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">install</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>npm install @runeauth/sdk</pre>
+                        </div>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">index.ts</span>
+                                <span class="code-block-lang">typescript</span>
+                            </div>
+                            <pre><span class="kw">import</span> { Rune } <span class="kw">from</span> <span class="str">'@runeauth/sdk'</span>
+
+<span class="kw">const</span> rune = <span class="kw">new</span> <span class="fn">Rune</span>({
+  apiKey:  process.env.<span class="var">RUNE_API_KEY</span>,   <span class="cmt">// API key from Step 5</span>
+  baseUrl: <span class="str">'http://localhost:4078'</span>,
+})
+
+<span class="cmt">// Grant alice viewer access on doc:report</span>
+<span class="kw">await</span> rune.<span class="fn">allow</span>({
+  subject:  <span class="str">'user:alice'</span>,
+  relation: <span class="str">'viewer'</span>,
+  object:   <span class="str">'doc:report'</span>,
+})
+
+<span class="cmt">// Check access — returns ALLOW</span>
+<span class="kw">const</span> result = <span class="kw">await</span> rune.<span class="fn">can</span>(<span class="str">'user:alice'</span>).<span class="fn">do</span>(<span class="str">'read'</span>).<span class="fn">on</span>(<span class="str">'doc:report'</span>).<span class="fn">check</span>()
+console.<span class="fn">log</span>(result.status) <span class="cmt">// "ALLOW"</span>
+console.<span class="fn">log</span>(result.trace)  <span class="cmt">// full decision path</span></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 8 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">8</div></div>
+                    <div class="step-col-body">
+                        <h3>Harden for production</h3>
+                        <p>Before exposing the engine to the internet, complete these steps.</p>
+                        <ul class="checklist">
+                            <li>
+                                <span class="check-icon">1</span>
+                                <span><strong>Put a reverse proxy in front.</strong> Run Nginx, Caddy, or a cloud load balancer that terminates TLS. Never expose the engine's port (4078) directly to the public internet.</span>
+                            </li>
+                            <li>
+                                <span class="check-icon">2</span>
+                                <span><strong>Set <code>NODE_ENV=production</code></strong> in your <code>.env</code>. This disables verbose error messages in API responses.</span>
+                            </li>
+                            <li>
+                                <span class="check-icon">3</span>
+                                <span><strong>Restrict <code>ADMIN_API_KEY</code> access.</strong> The <code>/admin</code> dashboard should only be accessible internally (e.g., via VPN or IP allowlist on your proxy).</span>
+                            </li>
+                            <li>
+                                <span class="check-icon">4</span>
+                                <span><strong>Use a managed Postgres instance</strong> (RDS, Cloud SQL, Supabase) instead of the Docker Compose Postgres for production databases. Enable daily backups and point-in-time recovery.</span>
+                            </li>
+                            <li>
+                                <span class="check-icon">5</span>
+                                <span><strong>Store secrets in a secret manager</strong> (AWS Secrets Manager, Vault, Doppler). Never commit <code>.env</code> to source control.</span>
+                            </li>
+                            <li>
+                                <span class="check-icon">6</span>
+                                <span><strong>Set up log shipping.</strong> The engine emits structured JSON logs via Pino. Forward them to Datadog, CloudWatch, Loki, or your log aggregator of choice.</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div><!-- /setup-steps -->
+
+            <!-- Env vars reference -->
+            <div class="setup-section">
+                <div class="setup-section-title">Environment Variables Reference — Production</div>
+                <table class="env-table">
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Default</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>DATABASE_URL</code> <span class="required-badge">required</span></td>
+                            <td>—</td>
+                            <td>Postgres connection string. Use the internal hostname in Docker/Render environments.</td>
+                        </tr>
+                        <tr>
+                            <td><code>PORT</code></td>
+                            <td><code>4078</code></td>
+                            <td>HTTP port the engine listens on.</td>
+                        </tr>
+                        <tr>
+                            <td><code>NODE_ENV</code></td>
+                            <td><code>development</code></td>
+                            <td>Set to <code>production</code> to suppress verbose error details in API responses.</td>
+                        </tr>
+                        <tr>
+                            <td><code>API_KEY_SALT</code> <span class="required-badge">required</span></td>
+                            <td>—</td>
+                            <td>32-byte hex salt for SHA-256 API key hashing. Generate once with <code>openssl rand -hex 32</code>. Never change after issuing keys.</td>
+                        </tr>
+                        <tr>
+                            <td><code>ADMIN_API_KEY</code></td>
+                            <td>—</td>
+                            <td>If set, enables the <code>/admin</code> dashboard UI. If omitted, the dashboard is fully disabled.</td>
+                        </tr>
+                        <tr>
+                            <td><code>MAX_CACHE_SIZE</code></td>
+                            <td><code>10000</code></td>
+                            <td>Maximum LRU cache entries per tenant. Increase for high-traffic deployments with many distinct subjects/objects.</td>
+                        </tr>
+                        <tr>
+                            <td><code>MAX_BFS_DEPTH</code></td>
+                            <td><code>20</code></td>
+                            <td>Maximum graph traversal depth per check. Guards against deeply nested relationship chains.</td>
+                        </tr>
+                        <tr>
+                            <td><code>MAX_BFS_NODES</code></td>
+                            <td><code>1000</code></td>
+                            <td>Maximum nodes visited per check. Guards against wide graph traversals (large groups).</td>
+                        </tr>
+                        <tr>
+                            <td><code>RATE_LIMIT_MAX</code></td>
+                            <td><code>100</code></td>
+                            <td>Maximum requests per API key per rate-limit window.</td>
+                        </tr>
+                        <tr>
+                            <td><code>RATE_LIMIT_WINDOW_MS</code></td>
+                            <td><code>10000</code></td>
+                            <td>Rate-limit window duration in milliseconds (default: 10 seconds).</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="setup-section">
+                <div class="setup-section-title">Troubleshooting — Production Deploy</div>
+                <table class="trouble-table">
+                    <thead>
+                        <tr>
+                            <th>Symptom</th>
+                            <th>Fix</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Container exits immediately</td>
+                            <td>Run <code>docker compose logs rune-engine</code>. Most likely <code>DATABASE_URL</code> is missing or Postgres hasn't finished starting — add a <code>depends_on: condition: service_healthy</code> or wait 5 seconds and retry.</td>
+                        </tr>
+                        <tr>
+                            <td><code>/v1/health</code> returns <code>db: "error"</code></td>
+                            <td>Postgres is unreachable. Verify the hostname in <code>DATABASE_URL</code> matches the Compose service name (<code>postgres</code>). Check <code>docker compose ps</code> — both services must be running.</td>
+                        </tr>
+                        <tr>
+                            <td>API returns <code>401 Unauthorized</code></td>
+                            <td>The <code>x-api-key</code> header is missing, wrong, or the key was generated against a different <code>API_KEY_SALT</code>. Re-run setup if you changed the salt after creating keys.</td>
+                        </tr>
+                        <tr>
+                            <td>Admin dashboard returns 403</td>
+                            <td>You must pass <code>ADMIN_API_KEY</code> in the <code>x-admin-key</code> header (not the regular API key). If <code>ADMIN_API_KEY</code> was not set in <code>.env</code>, the dashboard is disabled entirely.</td>
+                        </tr>
+                        <tr>
+                            <td>Port 4078 already in use</td>
+                            <td>Either change <code>PORT</code> in <code>.env</code>, or free the port: <code>lsof -ti:4078 | xargs kill -9</code></td>
+                        </tr>
+                        <tr>
+                            <td>Decisions are always <code>NOT_FOUND</code></td>
+                            <td>Expected on a fresh install — no relationship tuples exist yet. Write tuples with <code>rune.allow()</code> or via <code>POST /v1/tuples</code>, then re-check.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div><!-- /tab-production -->
+
+
+        <!-- ════════════════════════════════════════
+             OPTION B — LOCAL DEVELOPMENT
+        ════════════════════════════════════════ -->
+        <div class="tab-panel" id="tab-local">
+            <div class="panel-header">
+                <h2>Run Rune locally from source.</h2>
+                <p>Clone the monorepo, start a local Postgres container, and run the engine with hot reload.
+                   This path is for contributors, or developers who want to customise the engine.</p>
+            </div>
+
+            <!-- Prerequisites -->
+            <div class="prereqs">
+                <h3>Prerequisites</h3>
+                <ul class="prereq-list">
+                    <li><strong>Node.js ≥ 18</strong> — <a href="https://nodejs.org" target="_blank">nodejs.org</a> (we recommend using <a href="https://github.com/nvm-sh/nvm" target="_blank">nvm</a> or <a href="https://volta.sh" target="_blank">Volta</a> to manage versions)</li>
+                    <li><strong>pnpm 9.x</strong> — <code>npm install -g pnpm@9</code></li>
+                    <li><strong>Docker Desktop</strong> (or Docker Engine + Compose v2) — <a href="https://www.docker.com/products/docker-desktop/" target="_blank">docker.com</a> — used only for local Postgres</li>
+                    <li><strong>git</strong> — pre-installed on macOS/Linux; <a href="https://git-scm.com/download/win" target="_blank">git-scm.com</a> for Windows</li>
+                </ul>
+            </div>
+
+            <!-- Steps -->
+            <div class="setup-steps">
+
+                <!-- Step 1 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">1</div></div>
+                    <div class="step-col-body">
+                        <h3>Clone the repository</h3>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>git clone https://github.com/praveenraj-sk/Rune.git
+cd Rune</pre>
+                        </div>
+                        <p>The repository is a pnpm monorepo with four packages: <code>engine</code>, <code>core</code>, <code>sdk</code>, and <code>cli</code>.</p>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">2</div></div>
+                    <div class="step-col-body">
+                        <h3>Install all workspace dependencies</h3>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>pnpm install</pre>
+                        </div>
+                        <p>pnpm resolves and links all packages in the monorepo in a single pass.
+                           This typically takes 20–30 seconds on first run.</p>
+                        <div class="callout info">
+                            <span class="callout-icon">ℹ</span>
+                            <span>If you run <code>npm install</code> or <code>yarn</code> by mistake, delete <code>node_modules</code> and run <code>pnpm install</code> again. Mixed package managers can corrupt the workspace symlinks.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">3</div></div>
+                    <div class="step-col-body">
+                        <h3>Start the local Postgres container</h3>
+                        <p>The development Compose file starts a Postgres instance on port <strong>5433</strong>
+                           (not the default 5432, to avoid conflicts with any locally installed Postgres).</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>docker compose up -d
+<span class="cmt"># Starts postgres on localhost:5433</span></pre>
+                        </div>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">verify postgres is running</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>docker compose ps
+<span class="cmt"># Should show: rune-postgres   Up</span></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">4</div></div>
+                    <div class="step-col-body">
+                        <h3>Configure environment variables</h3>
+                        <p>Copy the example environment file and review the values. The defaults are pre-configured for local development — no editing required to get started.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>cp .env.example .env</pre>
+                        </div>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">.env.example (pre-filled defaults)</span>
+                                <span class="code-block-lang">env</span>
+                            </div>
+                            <pre>DATABASE_URL=postgresql://rune:runepassword@localhost:5433/runedb
+PORT=4078
+NODE_ENV=development
+API_KEY_SALT=dev-salt-change-in-production
+CACHE_MAX_SIZE=10000
+BFS_MAX_DEPTH=20
+BFS_MAX_NODES=1000</pre>
+                        </div>
+                        <div class="callout warn">
+                            <span class="callout-icon">⚠</span>
+                            <span><strong>Never commit <code>.env</code></strong> — it is in <code>.gitignore</code>.
+                            The default <code>API_KEY_SALT</code> is fine for local development, but must be replaced with a strong random value in any shared or production environment.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">5</div></div>
+                    <div class="step-col-body">
+                        <h3>Run setup — create the schema and your first API key</h3>
+                        <p>The setup script connects to Postgres, creates all tables and indexes, then creates your first tenant and API key.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>pnpm run setup
+<span class="cmt"># Note: use "pnpm run setup", NOT "pnpm setup"</span>
+<span class="cmt"># "pnpm setup" installs pnpm itself — not what you want</span></pre>
+                        </div>
+                        <p>When prompted, enter any tenant name (e.g. <code>dev</code>). Save the printed API key.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">expected output</span>
+                                <span class="code-block-lang">output</span>
+                            </div>
+                            <pre>  ✓ Setup complete!
+
+  Tenant ID  84d1aef9-...
+  API Key    rune_158Yy...
+
+  ⚠️  Save your API key — it will not be shown again.</pre>
+                        </div>
+                        <p>Add the API key to your <code>.env</code> so tests and the CLI can use it:</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">.env — add this line</span>
+                                <span class="code-block-lang">env</span>
+                            </div>
+                            <pre>RUNE_API_KEY=rune_158Yy...</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 6 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">6</div></div>
+                    <div class="step-col-body">
+                        <h3>Start the engine with hot reload</h3>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">terminal</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>pnpm dev</pre>
+                        </div>
+                        <p>The engine starts at <strong>http://localhost:4078</strong> using <code>tsx watch</code> for hot reload.
+                           Any change to a file in <code>packages/engine/src/</code> triggers an automatic restart in ~500ms.</p>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">expected log output</span>
+                                <span class="code-block-lang">output</span>
+                            </div>
+                            <pre>{"level":"info","msg":"Rune engine running","port":4078,"env":"development"}</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 7 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">7</div></div>
+                    <div class="step-col-body">
+                        <h3>Verify the engine is healthy</h3>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">health check</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>curl http://localhost:4078/v1/health
+<span class="cmt"># → {"status":"ok","db":"connected"}</span></pre>
+                        </div>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">test a permission check</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>curl -s -X POST http://localhost:4078/v1/can \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: <span class="hl">YOUR_API_KEY</span>" \
+  -d '{"subject":"user:alice","action":"read","object":"doc:report"}' | jq .
+
+<span class="cmt"># → {"decision":"deny","status":"NOT_FOUND",...}  ← correct, no tuples yet</span></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 8 -->
+                <div class="setup-step">
+                    <div class="step-col-num"><div class="step-circle">8</div></div>
+                    <div class="step-col-body">
+                        <h3>Run the test suite</h3>
+                        <p>Rune has 170 tests across engine, SDK, and core — unit, integration, security attack suite, chaos, and observability.</p>
+                        <div class="two-col">
+                            <div class="code-block">
+                                <div class="code-block-bar">
+                                    <span class="code-block-label">engine (101 tests)</span>
+                                    <span class="code-block-lang">bash</span>
+                                </div>
+                                <pre>pnpm test</pre>
+                            </div>
+                            <div class="code-block">
+                                <div class="code-block-bar">
+                                    <span class="code-block-label">sdk (30 tests)</span>
+                                    <span class="code-block-lang">bash</span>
+                                </div>
+                                <pre>pnpm test:sdk</pre>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <div class="code-block-bar">
+                                <span class="code-block-label">core (39 tests)</span>
+                                <span class="code-block-lang">bash</span>
+                            </div>
+                            <pre>cd packages/core && pnpm test</pre>
+                        </div>
+                        <div class="callout info">
+                            <span class="callout-icon">ℹ</span>
+                            <span>Engine tests require a running Postgres and a valid <code>DATABASE_URL</code> in <code>.env</code>. Make sure Docker Compose is up before running <code>pnpm test</code>.</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /setup-steps -->
+
+            <!-- Daily workflow -->
+            <div class="setup-section">
+                <div class="setup-section-title">Daily Development Workflow</div>
+                <div class="code-block">
+                    <div class="code-block-bar">
+                        <span class="code-block-label">every day</span>
+                        <span class="code-block-lang">bash</span>
+                    </div>
+                    <pre><span class="cmt"># 1. Make sure Postgres is running</span>
+docker compose up -d
+
+<span class="cmt"># 2. Start the engine with hot reload (in a dedicated terminal)</span>
+pnpm dev
+
+<span class="cmt"># 3. Edit files in packages/engine/src/ — engine reloads automatically
+# 4. Run tests after changes</span>
+pnpm test
+
+<span class="cmt"># 5. Typecheck all packages</span>
+pnpm run typecheck</pre>
+                </div>
+            </div>
+
+            <!-- Reset DB -->
+            <div class="setup-section">
+                <div class="setup-section-title">Resetting the Database</div>
+                <p style="font-size:0.875rem;color:var(--text-muted);margin-bottom:12px;">
+                    If your local DB gets into a broken state (e.g. from a failed test run), do a full reset:
+                </p>
+                <div class="code-block">
+                    <div class="code-block-bar">
+                        <span class="code-block-label">full reset — deletes all data including API keys</span>
+                        <span class="code-block-lang">bash</span>
+                    </div>
+                    <pre><span class="cmt"># 1. Remove the Postgres volume</span>
+docker compose down -v
+
+<span class="cmt"># 2. Start a fresh Postgres</span>
+docker compose up -d
+
+<span class="cmt"># 3. Re-create schema + new API key</span>
+pnpm run setup
+
+<span class="cmt"># 4. Update RUNE_API_KEY in .env with the new key</span></pre>
+                </div>
+            </div>
+
+            <!-- Env vars reference -->
+            <div class="setup-section">
+                <div class="setup-section-title">Environment Variables Reference — Local Dev</div>
+                <table class="env-table">
+                    <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Default (local)</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>DATABASE_URL</code> <span class="required-badge">required</span></td>
+                            <td><code>postgresql://rune:runepassword<br>@localhost:5433/runedb</code></td>
+                            <td>Points to the local Docker Postgres on port 5433.</td>
+                        </tr>
+                        <tr>
+                            <td><code>PORT</code></td>
+                            <td><code>4078</code></td>
+                            <td>Engine HTTP port.</td>
+                        </tr>
+                        <tr>
+                            <td><code>NODE_ENV</code></td>
+                            <td><code>development</code></td>
+                            <td>Enables verbose error output in API responses (never use in production).</td>
+                        </tr>
+                        <tr>
+                            <td><code>API_KEY_SALT</code></td>
+                            <td><code>dev-salt-change-in-production</code></td>
+                            <td>Salt for hashing API keys. Fine for local dev — must be a strong random value in production.</td>
+                        </tr>
+                        <tr>
+                            <td><code>CACHE_MAX_SIZE</code></td>
+                            <td><code>10000</code></td>
+                            <td>LRU cache entries. Lower for dev machines with limited RAM.</td>
+                        </tr>
+                        <tr>
+                            <td><code>BFS_MAX_DEPTH</code></td>
+                            <td><code>20</code></td>
+                            <td>Max graph traversal depth. Keep at 20 to match production behaviour in tests.</td>
+                        </tr>
+                        <tr>
+                            <td><code>BFS_MAX_NODES</code></td>
+                            <td><code>1000</code></td>
+                            <td>Max nodes visited per check. Keep at 1000 to match production.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="setup-section">
+                <div class="setup-section-title">Troubleshooting — Local Development</div>
+                <table class="trouble-table">
+                    <thead>
+                        <tr>
+                            <th>Symptom</th>
+                            <th>Fix</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Invalid Rune config on startup</td>
+                            <td><code>DATABASE_URL</code> is missing. Make sure you ran <code>cp .env.example .env</code> and the <code>.env</code> file is at the project root.</td>
+                        </tr>
+                        <tr>
+                            <td><code>role "rune" does not exist</code></td>
+                            <td>Postgres container is not running or is on the wrong port. Run <code>docker compose up -d</code> and verify with <code>docker compose ps</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>EADDRINUSE :4078</code></td>
+                            <td>Another process is on port 4078. Free it: <code>lsof -ti:4078 | xargs kill -9</code></td>
+                        </tr>
+                        <tr>
+                            <td>Tests fail with 401</td>
+                            <td>DB is in a dirty state from a previous failed run. Full reset: <code>docker compose down -v && docker compose up -d && pnpm run setup</code>, then update <code>RUNE_API_KEY</code> in <code>.env</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>pnpm setup</code> installs pnpm itself</td>
+                            <td>Use <code>pnpm run setup</code> (with <code>run</code>) — this calls the project's setup script, not pnpm's built-in setup command.</td>
+                        </tr>
+                        <tr>
+                            <td>TypeScript errors after pulling changes</td>
+                            <td>Run <code>pnpm install</code> first — new dependencies may have been added. Then run <code>pnpm run typecheck</code>.</td>
+                        </tr>
+                        <tr>
+                            <td>SDK tests fail with network errors</td>
+                            <td>SDK tests expect the engine to be running at <code>http://localhost:4078</code>. Start it with <code>pnpm dev</code> in a separate terminal first.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div><!-- /tab-local -->
+
+    </div><!-- /setup-content -->
+
+    <!-- ═══ Footer ═══ -->
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="logo-icon">◆</span> Rune
+                <span class="footer-tagline">Relationship-based authorization engine.</span>
+            </div>
+            <div class="footer-links">
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <a href="index.html#features">Features</a>
+                    <a href="index.html#how-it-works">How It Works</a>
+                    <a href="setup.html">Setup Guide</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Resources</h4>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/SDK-GUIDE.md" target="_blank">SDK Guide</a>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/ARCHITECTURE.md" target="_blank">Architecture</a>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/DEPLOY.md" target="_blank">Deploy Guide</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Community</h4>
+                    <a href="https://github.com/praveenraj-sk/Rune" target="_blank">GitHub</a>
+                    <a href="https://www.npmjs.com/package/@runeauth/sdk" target="_blank">npm</a>
+                    <a href="https://github.com/praveenraj-sk/Rune/blob/main/docs/CONTRIBUTING.md" target="_blank">Contributing</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© 2026 Rune. MIT License.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab)
+            })
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === 'tab-' + tab)
+            })
+            // Scroll to top of content
+            document.querySelector('.tab-bar').scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+
+        // Nav scroll effect
+        const nav = document.getElementById('nav')
+        if (nav) {
+            window.addEventListener('scroll', () => {
+                nav.classList.toggle('scrolled', window.scrollY > 50)
+            }, { passive: true })
+        }
+    </script>
+</body>
+
+</html>
