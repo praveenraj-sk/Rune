@@ -1,17 +1,18 @@
 # ─────────────────────────────────────────────────────────
-# Rune — Local Development
-# (builds from source — requires cloning the repo)
+# Rune — 1-Minute Self-Host (no source code needed)
 #
-# For production self-hosting (no source needed):
-#   use docker-compose.prod.yml
+# Usage:
+#   curl -O https://raw.githubusercontent.com/praveenraj-sk/Rune/main/docker-compose.prod.yml
+#   docker compose -f docker-compose.prod.yml up -d
 #
-# Start:  docker compose up -d
-# Stop:   docker compose down
-# Reset:  docker compose down -v
+# Then install the SDK:
+#   npm install @runeauth/sdk
+#
+# Default dev API key: rune-dev-key
+# Change JWT_SECRET and API_KEY before going to production.
 # ─────────────────────────────────────────────────────────
 
 services:
-  # Postgres — persistent storage
   postgres:
     image: postgres:16-alpine
     container_name: rune-postgres
@@ -20,8 +21,6 @@ services:
       POSTGRES_USER: rune
       POSTGRES_PASSWORD: runepassword
       POSTGRES_DB: runedb
-    ports:
-      - "5433:5432"
     volumes:
       - rune_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -30,16 +29,16 @@ services:
       timeout: 5s
       retries: 5
 
-  # Rune Engine — authorization server
   rune:
-    build: .
+    image: ghcr.io/praveenraj-sk/rune:latest
     container_name: rune-engine
     restart: unless-stopped
     ports:
       - "4078:4078"
     environment:
       DATABASE_URL: postgres://rune:runepassword@postgres:5432/runedb
-      API_KEY: rune-dev-key
+      API_KEY: rune-dev-key        # change in production
+      JWT_SECRET: change-me-32chars-minimum   # change in production
       PORT: 4078
       NODE_ENV: production
     depends_on:

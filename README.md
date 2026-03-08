@@ -8,6 +8,7 @@ Add fine-grained, graph-traversal permissions to your app in minutes.
 [![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
 [![npm](https://img.shields.io/npm/v/@runeauth/sdk?color=black)](https://www.npmjs.com/package/@runeauth/sdk)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A518-black.svg)](https://nodejs.org)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fpraveenraj--sk%2Frune-black.svg)](https://ghcr.io/praveenraj-sk/rune)
 
 *"Can user:arjun read shipment:TN001?"*<br>
 Rune traces the graph — user → group → zone → resource — and returns ALLOW or DENY with a full explanation.
@@ -31,25 +32,33 @@ Rune traces the graph — user → group → zone → resource — and returns A
 
 ---
 
-## Quickstart
+## Quickstart — 1 minute, no source code needed
+
+**Step 1: Start the engine + Postgres**
 
 ```bash
-# 1. Clone & install
+curl -O https://raw.githubusercontent.com/praveenraj-sk/Rune/main/docker-compose.prod.yml
+docker compose -f docker-compose.prod.yml up -d
+# → engine running at http://localhost:4078
+```
+
+**Step 2: Install the SDK**
+
+```bash
+npm install @runeauth/sdk
+```
+
+Done. Default API key: `rune-dev-key` (change before production).
+
+---
+
+### Contributing / local dev
+
+```bash
 git clone https://github.com/praveenraj-sk/Rune.git && cd Rune
-pnpm install
-
-# 2. Start Postgres
-docker compose up -d
-
-# 3. Configure
-cp .env.example .env
-
-# 4. Create schema + first API key
-pnpm run setup
-
-# 5. Start the engine
-pnpm dev
-# → http://localhost:4078
+cp .env.example .env   # set DATABASE_URL
+docker compose up -d   # Postgres only (build: .)
+pnpm install && pnpm dev
 ```
 
 ---
