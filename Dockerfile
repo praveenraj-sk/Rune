@@ -45,7 +45,8 @@ COPY --from=builder /app/pnpm-lock.yaml .
 # Copy engine
 COPY --from=builder /app/packages/engine/package.json ./packages/engine/
 COPY --from=builder /app/packages/engine/dist ./packages/engine/dist
-COPY --from=builder /app/packages/engine/src/db/schema.sql ./packages/engine/src/db/schema.sql
+COPY --from=builder /app/packages/engine/migrations ./packages/engine/migrations
+COPY --from=builder /app/packages/engine/scripts ./packages/engine/scripts
 
 # Copy SDK (engine workspace dependency)
 COPY --from=builder /app/packages/sdk/package.json ./packages/sdk/
